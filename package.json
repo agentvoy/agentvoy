@@ -1,0 +1,23 @@
+{
+  "name": "agentvoy",
+  "private": true,
+  "version": "0.1.0",
+  "description": "The universal agent development platform. Scaffold, configure, and guard AI agents across any framework.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "npm@10.8.2"
+}

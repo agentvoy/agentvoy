@@ -1,0 +1,23 @@
+{
+  "name": "@agentvoy/core",
+  "version": "0.1.0",
+  "description": "Core engine for AgentVoy — guardrails config parser, framework adapters, and agent runtime utilities",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "yaml": "^2.7.0",
+    "ajv": "^8.17.0",
+    "chalk": "^5.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^20.0.0"
+  },
+  "license": "Apache-2.0"
+}

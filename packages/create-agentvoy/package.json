@@ -1,0 +1,29 @@
+{
+  "name": "create-agentvoy",
+  "version": "0.1.0",
+  "description": "Create a new AgentVoy project — npx create-agentvoy my-agent",
+  "bin": {
+    "create-agentvoy": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentvoy/core": "*",
+    "commander": "^13.0.0",
+    "inquirer": "^12.0.0",
+    "chalk": "^5.4.0",
+    "ora": "^8.0.0",
+    "fs-extra": "^11.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^20.0.0",
+    "@types/fs-extra": "^11.0.0"
+  },
+  "license": "Apache-2.0"
+}
