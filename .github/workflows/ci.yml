@@ -58,8 +58,11 @@ jobs:
 
       - name: Scaffold and verify all frameworks
         run: |
-          CLI="node packages/cli/dist/index.js"
+          REPO_ROOT="$(pwd)"
+          CLI="node $REPO_ROOT/packages/cli/dist/index.js"
+          OUTDIR="$(mktemp -d)"
 
+          cd "$OUTDIR"
           $CLI create test-openai    --framework openai     --provider openai     --model gpt-4o                    --yes
           $CLI create test-google    --framework google-adk --provider google     --model gemini-2.0-flash          --yes
           $CLI create test-crewai    --framework crewai     --provider openai     --model gpt-4o                    --yes
@@ -67,10 +70,10 @@ jobs:
           $CLI create test-langgraph --framework langgraph  --provider openai     --model gpt-4o                    --yes
 
           for dir in test-openai test-google test-crewai test-anthropic test-langgraph; do
-            echo "Checking $dir..."
-            ls -la $dir/
-            test -f $dir/agent.guard.yml || (echo "MISSING agent.guard.yml in $dir" && exit 1)
-            test -f $dir/requirements.txt || (echo "MISSING requirements.txt in $dir" && exit 1)
-            test -f $dir/run.py || (echo "MISSING run.py in $dir" && exit 1)
+            echo "Checking $OUTDIR/$dir..."
+            ls -la "$OUTDIR/$dir/"
+            test -f "$OUTDIR/$dir/agent.guard.yml" || (echo "MISSING agent.guard.yml in $dir" && exit 1)
+            test -f "$OUTDIR/$dir/requirements.txt" || (echo "MISSING requirements.txt in $dir" && exit 1)
+            test -f "$OUTDIR/$dir/run.py"           || (echo "MISSING run.py in $dir" && exit 1)
             echo "$dir OK"
           done
