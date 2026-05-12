@@ -73,8 +73,8 @@ npx agentvoy validate
 | **OpenAI Agents SDK** | Python | Available |
 | **Google ADK** | Python | Available |
 | **CrewAI** | Python | Available |
-| LangGraph | Python | Coming soon |
-| Anthropic SDK | Python/TS | Coming soon |
+| **LangGraph** | Python | Available |
+| **Anthropic SDK** | Python | Available |
 | LlamaIndex | Python | Coming soon |
 | AutoGen / MAF | Python | Coming soon |
 | Custom | Any | Coming soon |

@@ -1,0 +1,268 @@
+/**
+ * Anthropic SDK Adapter
+ *
+ * Scaffolds projects using the Anthropic Agent SDK (Python).
+ */
+
+import type {
+  FrameworkAdapter,
+  ScaffoldConfig,
+  ScaffoldResult,
+  AgentGuardConfig,
+  ValidationResult,
+  GeneratedFile,
+} from "../types.js";
+import { generateDefaultConfig } from "../config.js";
+
+export const anthropicAdapter: FrameworkAdapter = {
+  name: "anthropic",
+  displayName: "Anthropic SDK",
+  language: "python",
+
+  async scaffold(config: ScaffoldConfig): Promise<ScaffoldResult> {
+    const files: GeneratedFile[] = [
+      {
+        path: "agent.py",
+        content: generateAgentFile(config),
+      },
+      {
+        path: "tools.py",
+        content: generateToolsFile(config),
+      },
+      {
+        path: "run.py",
+        content: generateRunFile(config),
+      },
+      {
+        path: "requirements.txt",
+        content: generateRequirements(),
+      },
+      {
+        path: ".env.example",
+        content: "ANTHROPIC_API_KEY=your-api-key-here\n",
+      },
+      {
+        path: "agent.guard.yml",
+        content: generateDefaultConfig(
+          config.projectName,
+          "anthropic",
+          config.model.model || "claude-sonnet-4-20250514"
+        ),
+      },
+    ];
+
+    return {
+      files,
+      dependencies: {},
+      devDependencies: {},
+      scripts: {
+        start: "python run.py",
+      },
+      postInstallInstructions: [
+        "pip install -r requirements.txt",
+        "cp .env.example .env",
+        "Add your ANTHROPIC_API_KEY to .env",
+        "python run.py",
+      ],
+    };
+  },
+
+  validateConfig(config: AgentGuardConfig): ValidationResult {
+    const errors: { field: string; message: string }[] = [];
+    const warnings: { field: string; message: string }[] = [];
+
+    if (config.model.provider !== "anthropic") {
+      warnings.push({
+        field: "model.provider",
+        message: `Anthropic adapter works best with provider "anthropic", got "${config.model.provider}"`,
+      });
+    }
+
+    return { valid: errors.length === 0, errors, warnings };
+  },
+
+  getDependencies() {
+    return {
+      anthropic: ">=0.40.0",
+      "python-dotenv": ">=1.0.0",
+    };
+  },
+};
+
+function generateAgentFile(config: ScaffoldConfig): string {
+  const model = config.model.model || "claude-sonnet-4-20250514";
+  const maxIterations = config.guardrails?.behavior?.max_iterations || 20;
+
+  return `"""
+${config.projectName} — Built with AgentVoy
+https://github.com/agentvoy
+"""
+
+import anthropic
+from tools import get_tools, process_tool_call
+
+
+def create_client() -> anthropic.Anthropic:
+    """Create the Anthropic client."""
+    return anthropic.Anthropic()
+
+
+def run_agent(prompt: str) -> str:
+    """Run the agent with an agentic loop."""
+    client = create_client()
+    tools = get_tools()
+    messages = [{"role": "user", "content": prompt}]
+
+    iteration = 0
+    max_iterations = ${maxIterations}
+
+    while iteration < max_iterations:
+        iteration += 1
+
+        response = client.messages.create(
+            model="${model}",
+            max_tokens=8096,
+            tools=tools,
+            messages=messages,
+        )
+
+        # Add assistant response to messages
+        messages.append({"role": "assistant", "content": response.content})
+
+        # If no tool calls, we're done
+        if response.stop_reason == "end_turn":
+            # Extract final text response
+            for block in response.content:
+                if hasattr(block, "text"):
+                    return block.text
+            return "Done."
+
+        # Process tool calls
+        if response.stop_reason == "tool_use":
+            tool_results = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    result = process_tool_call(block.name, block.input)
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": str(result),
+                    })
+
+            messages.append({"role": "user", "content": tool_results})
+
+    return "Max iterations reached."
+`;
+}
+
+function generateToolsFile(_config: ScaffoldConfig): string {
+  return `"""
+Agent tools — add your custom tools here.
+"""
+
+
+def get_tools() -> list:
+    """Return tool definitions for the Anthropic API."""
+    return [
+        {
+            "name": "search_web",
+            "description": "Search the web for information on a given topic.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query.",
+                    }
+                },
+                "required": ["query"],
+            },
+        },
+        {
+            "name": "read_file",
+            "description": "Read the contents of a file.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Path to the file to read.",
+                    }
+                },
+                "required": ["path"],
+            },
+        },
+    ]
+
+
+def process_tool_call(tool_name: str, tool_input: dict) -> str:
+    """Execute a tool call and return the result."""
+    if tool_name == "search_web":
+        return _search_web(tool_input["query"])
+    elif tool_name == "read_file":
+        return _read_file(tool_input["path"])
+    else:
+        return f"Unknown tool: {tool_name}"
+
+
+def _search_web(query: str) -> str:
+    """Search the web for information."""
+    # TODO: Implement your search logic (e.g., Tavily, Serper, Brave Search)
+    return f"Search results for: {query}"
+
+
+def _read_file(path: str) -> str:
+    """Read a file's contents."""
+    try:
+        with open(path, "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        return f"File not found: {path}"
+    except PermissionError:
+        return f"Permission denied: {path}"
+`;
+}
+
+function generateRunFile(config: ScaffoldConfig): string {
+  return `"""
+Run the ${config.projectName} agent.
+"""
+
+from dotenv import load_dotenv
+from agent import run_agent
+
+load_dotenv()
+
+
+def main():
+    print("\\n🚀 ${config.projectName} — Powered by AgentVoy")
+    print("=" * 50)
+    print("Type your prompt (or 'quit' to exit):\\n")
+
+    while True:
+        try:
+            prompt = input("> ")
+            if prompt.lower() in ("quit", "exit", "q"):
+                print("\\nGoodbye!")
+                break
+            if not prompt.strip():
+                continue
+
+            print("\\nThinking...\\n")
+            result = run_agent(prompt)
+            print(f"\\n{result}\\n")
+        except KeyboardInterrupt:
+            print("\\n\\nGoodbye!")
+            break
+
+
+if __name__ == "__main__":
+    main()
+`;
+}
+
+function generateRequirements(): string {
+  return `anthropic>=0.40.0
+python-dotenv>=1.0.0
+`;
+}
