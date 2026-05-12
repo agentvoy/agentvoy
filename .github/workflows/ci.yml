@@ -69,11 +69,18 @@ jobs:
           $CLI create test-anthropic --framework anthropic  --provider anthropic  --model claude-sonnet-4-20250514  --yes
           $CLI create test-langgraph --framework langgraph  --provider openai     --model gpt-4o                    --yes
 
+          # All frameworks must have agent.guard.yml and requirements.txt
           for dir in test-openai test-google test-crewai test-anthropic test-langgraph; do
             echo "Checking $OUTDIR/$dir..."
             ls -la "$OUTDIR/$dir/"
-            test -f "$OUTDIR/$dir/agent.guard.yml" || (echo "MISSING agent.guard.yml in $dir" && exit 1)
-            test -f "$OUTDIR/$dir/requirements.txt" || (echo "MISSING requirements.txt in $dir" && exit 1)
-            test -f "$OUTDIR/$dir/run.py"           || (echo "MISSING run.py in $dir" && exit 1)
+            test -f "$OUTDIR/$dir/agent.guard.yml" || { echo "MISSING agent.guard.yml in $dir"; exit 1; }
+            test -f "$OUTDIR/$dir/requirements.txt" || { echo "MISSING requirements.txt in $dir"; exit 1; }
             echo "$dir OK"
           done
+
+          # Frameworks that use run.py (Google ADK uses 'adk run' instead)
+          for dir in test-openai test-crewai test-anthropic test-langgraph; do
+            test -f "$OUTDIR/$dir/run.py" || { echo "MISSING run.py in $dir"; exit 1; }
+          done
+
+          echo "All frameworks verified successfully"
