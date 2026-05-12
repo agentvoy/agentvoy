@@ -56,28 +56,21 @@ jobs:
       - name: Test list command
         run: node packages/cli/dist/index.js list
 
-      - name: Scaffold OpenAI agent
-        run: node packages/cli/dist/index.js create test-openai --framework openai --provider openai --model gpt-4o --yes
-
-      - name: Scaffold Google ADK agent
-        run: node packages/cli/dist/index.js create test-google --framework google-adk --provider google --model gemini-2.0-flash --yes
-
-      - name: Scaffold CrewAI agent
-        run: node packages/cli/dist/index.js create test-crewai --framework crewai --provider openai --model gpt-4o --yes
-
-      - name: Scaffold Anthropic agent
-        run: node packages/cli/dist/index.js create test-anthropic --framework anthropic --provider anthropic --model claude-sonnet-4-20250514 --yes
-
-      - name: Scaffold LangGraph agent
-        run: node packages/cli/dist/index.js create test-langgraph --framework langgraph --provider openai --model gpt-4o --yes
-
-      - name: Verify scaffolded files exist
+      - name: Scaffold and verify all frameworks
         run: |
+          CLI="node packages/cli/dist/index.js"
+
+          $CLI create test-openai    --framework openai     --provider openai     --model gpt-4o                    --yes
+          $CLI create test-google    --framework google-adk --provider google     --model gemini-2.0-flash          --yes
+          $CLI create test-crewai    --framework crewai     --provider openai     --model gpt-4o                    --yes
+          $CLI create test-anthropic --framework anthropic  --provider anthropic  --model claude-sonnet-4-20250514  --yes
+          $CLI create test-langgraph --framework langgraph  --provider openai     --model gpt-4o                    --yes
+
           for dir in test-openai test-google test-crewai test-anthropic test-langgraph; do
             echo "Checking $dir..."
             ls -la $dir/
-            test -f $dir/agent.guard.yml || exit 1
-            test -f $dir/requirements.txt || exit 1
-            test -f $dir/run.py || exit 1
+            test -f $dir/agent.guard.yml || (echo "MISSING agent.guard.yml in $dir" && exit 1)
+            test -f $dir/requirements.txt || (echo "MISSING requirements.txt in $dir" && exit 1)
+            test -f $dir/run.py || (echo "MISSING run.py in $dir" && exit 1)
             echo "$dir OK"
           done
