@@ -1,14 +1,16 @@
 <p align="center">
   <h1 align="center">AgentVoy</h1>
   <p align="center">
-    The universal agent development platform.<br/>
-    Scaffold, configure, and guard AI agents across any framework.
+    The universal AI agent platform.<br/>
+    Scaffold, configure, guard, and deploy AI agents across any framework.
   </p>
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> |
+  <a href="#two-paths">Two Paths</a> |
   <a href="#frameworks">Frameworks</a> |
+  <a href="#deploy">Deploy</a> |
   <a href="#agent-guard-config">Guard Config</a> |
   <a href="#commands">Commands</a> |
   <a href="#contributing">Contributing</a>
@@ -23,45 +25,103 @@
 
 ---
 
-**AgentVoy** is a CLI tool and SDK that lets you scaffold production-ready AI agent projects in seconds — with built-in guardrails, security defaults, and support for every major agent framework.
+**AgentVoy** is a CLI tool and SDK that lets you scaffold and deploy production-ready AI agent projects in seconds — with built-in guardrails, security defaults, and support for every major agent framework.
 
-**One command. Any framework. Any model. Secure by default.**
+**One command. Any framework. Any model. Deploy anywhere.**
 
-```bash
-npx agentvoy create my-agent
+## Two Paths
+
+AgentVoy asks upfront what you want to build:
+
+```
+$ npx agentvoy create my-project
+
+  ? What do you want to build?
+  > Agent — Local agent for development & experimentation
+    App   — Deployable agentic app (API + UI + Docker + cloud)
 ```
 
-## Why AgentVoy?
+### Path A — Agent
 
-Building AI agents today means choosing a framework, wiring up models, configuring security, and writing boilerplate — before you even start on your actual agent logic.
+Fast local development. Flat project structure, interactive REPL, zero infra.
 
-AgentVoy solves this:
+```bash
+npx agentvoy create my-project --yes
+# Creates: my-project-agent/
+```
 
-- **Multi-framework** — Google ADK, OpenAI Agents SDK, CrewAI, and more. One CLI, any framework.
-- **Any model** — OpenAI, Anthropic, Google, Ollama (local), Groq, Mistral. Bring your own API key.
-- **Secure by default** — Every project ships with `agent.guard.yml`, a universal guardrails config that defines permissions, cost limits, and behavior constraints.
-- **No GPU required** — Runs on any personal computer. Just bring your API key.
-- **Framework-agnostic guardrails** — One config format that works across all frameworks. Define it once, enforce everywhere.
+```
+my-project-agent/
+├── agent.py           # Agent logic
+├── tools.py           # Custom tools
+├── run.py             # Interactive REPL
+├── agent.guard.yml    # Guardrails & permissions
+├── requirements.txt
+└── .env.example
+```
+
+### Path B — App
+
+Deployable agentic app with a FastAPI server, Streamlit chat UI, and cloud configs.
+
+```bash
+npx agentvoy create my-project --build-mode app --deploy-target docker --yes
+# Creates: my-project-app/
+```
+
+```
+my-project-app/
+├── src/
+│   ├── agents/
+│   │   └── agent.py          # Agent logic
+│   ├── tools/
+│   │   └── tools.py          # Custom tools
+│   └── config/
+│       └── settings.py
+├── server.py                  # FastAPI — /run and /health
+├── streamlit_app.py           # Chat UI
+├── Dockerfile
+├── docker-compose.yml
+├── agent.guard.yml
+├── requirements.txt
+└── .env.example
+```
+
+**Multi-agent pipelines** are supported — choose sequential pipeline and name your agents:
+
+```bash
+npx agentvoy create my-project --build-mode app --agent-mode multi --yes
+# Creates: researcher → writer → reviewer pipeline
+```
+
+```
+src/
+├── agents/
+│   ├── researcher.py
+│   ├── writer.py
+│   └── reviewer.py
+└── pipeline.py          # Sequential orchestration
+```
 
 ## Quick Start
 
-### Create a new agent project
-
 ```bash
-# Interactive mode — choose your framework and model
-npx agentvoy create my-agent
+# Interactive — guided prompts for framework, model, and build mode
+npx agentvoy create my-project
 
-# Or specify everything upfront
-npx agentvoy create my-agent --framework openai --provider anthropic --model claude-sonnet-4-20250514
+# Agent mode with defaults (OpenAI + GPT-4o)
+npx agentvoy create my-project --yes
 
-# Quick start with defaults (OpenAI + GPT-4o)
-npx agentvoy create my-agent --yes
-```
+# App with Docker, fully non-interactive
+npx agentvoy create my-project \
+  --framework openai \
+  --provider anthropic \
+  --model claude-sonnet-4-20250514 \
+  --build-mode app \
+  --deploy-target docker \
+  --yes
 
-### Add guardrails to an existing project
-
-```bash
-# Initialize agent.guard.yml in your current project
+# Add guardrails to an existing project
 npx agentvoy init
 
 # Validate your config
@@ -78,12 +138,9 @@ npx agentvoy validate
 | **LangGraph** | Python | Available |
 | **Anthropic SDK** | Python | Available |
 | LlamaIndex | Python | Coming soon |
-| AutoGen / MAF | Python | Coming soon |
-| Custom | Any | Coming soon |
+| AutoGen | Python | Coming soon |
 
 ## Model Providers
-
-Bring your own API key. AgentVoy supports:
 
 | Provider | Models | API Key Env |
 |----------|--------|-------------|
@@ -94,9 +151,57 @@ Bring your own API key. AgentVoy supports:
 | **Groq** | llama-3.3-70b-versatile | `GROQ_API_KEY` |
 | **Mistral** | mistral-large-latest | `MISTRAL_API_KEY` |
 
+## Deploy
+
+### Deploy during creation
+
+Pick a deployment target when creating an app project:
+
+```
+? Deployment target:
+> Docker
+  Fly.io
+  Railway
+  GCP Cloud Run
+  AWS Lambda
+```
+
+### Deploy an existing agent project
+
+```bash
+cd my-project-agent
+npx agentvoy deploy --target docker
+```
+
+This generates `server.py`, `streamlit_app.py`, and all deployment files for the chosen target — without touching your existing agent code.
+
+### Deployment targets
+
+| Target | Files generated | CLI required |
+|--------|----------------|--------------|
+| **Docker** | `Dockerfile`, `.dockerignore`, `docker-compose.yml` | `docker` |
+| **Fly.io** | `deploy/fly.toml` | `flyctl` |
+| **Railway** | `deploy/railway.json` | `railway` |
+| **GCP Cloud Run** | `deploy/cloud-run.yaml` | `gcloud` |
+| **AWS Lambda** | `deploy/template.yaml`, `deploy/lambda_handler.py` | `aws`, `sam` |
+
+### Guard-to-infrastructure mapping
+
+`agent.guard.yml` settings flow directly into deployment configuration:
+
+```yaml
+guardrails:
+  behavior:
+    timeout: 5m       → Docker HEALTHCHECK interval, Cloud Run timeout
+    cost_limit: $1.00 → Container memory limit (512Mi)
+permissions:
+  execution:
+    allow_shell: false → non-root Docker user
+```
+
 ## Agent Guard Config
 
-Every AgentVoy project includes an `agent.guard.yml` file — a universal, declarative configuration for agent security and behavior.
+Every AgentVoy project includes `agent.guard.yml` — a universal declarative config for security and behavior.
 
 ```yaml
 version: "1.0"
@@ -115,13 +220,11 @@ permissions:
   network:
     mode: restricted
     allow: ["*.github.com", "*.stackoverflow.com"]
-    deny: ["*.social-media.com"]
   filesystem:
     read: ["./**"]
     write: ["./output/**"]
   tools:
     require_approval: ["delete_*", "send_*", "deploy_*"]
-    max_cost_per_run: "$1.00"
   execution:
     allow_shell: false
     allow_subprocess: false
@@ -135,19 +238,10 @@ guardrails:
   output:
     block_harmful_content: true
     max_output_tokens: 8192
-    pii_redaction: false
-    hallucination_check: false
   behavior:
     max_iterations: 20
     timeout: 5m
-    max_tool_calls: 50
-    human_approval_after: 10
-    retry_limit: 3
     cost_limit: "$1.00"
-
-auth:
-  type: api_key
-  token_storage: env
 
 observability:
   tracing: true
@@ -155,69 +249,64 @@ observability:
   cost_tracking: true
 ```
 
-### What `agent.guard.yml` controls
+### Runtime enforcement — `agentvoy-guard`
 
-| Section | What it does |
-|---------|-------------|
-| **identity** | Agent name, version, and metadata |
-| **model** | LLM provider, model, and API key configuration |
-| **permissions** | Network access, filesystem access, tool restrictions, shell execution |
-| **guardrails.input** | Prompt injection blocking, PII detection, content filtering |
-| **guardrails.output** | Harmful content blocking, schema validation, PII redaction |
-| **guardrails.behavior** | Iteration limits, timeouts, cost caps, human-in-the-loop triggers |
-| **auth** | Authentication type and token storage |
-| **observability** | Tracing, logging, and cost tracking |
+```bash
+pip install agentvoy-guard
+```
+
+```python
+from agentvoy_guard import Guard
+
+guard = Guard.from_config()  # reads agent.guard.yml
+
+with guard.session() as session:
+    session.check_input(user_prompt)
+    result = my_agent.run(user_prompt)
+    session.check_output(result)
+```
 
 ## Commands
 
 ```bash
-agentvoy create [name]     # Create a new agent project
+agentvoy create [name]     # Create a new agent or app project
+agentvoy deploy            # Add deployment config to an existing project
 agentvoy init              # Add agent.guard.yml to an existing project
 agentvoy validate          # Validate your agent.guard.yml config
-agentvoy list              # List supported frameworks and models
-```
-
-## Project Structure
-
-A scaffolded OpenAI agent project:
-
-```
-my-agent/
-  agent.py             # Agent definition
-  tools.py             # Custom tools
-  run.py               # Entry point
-  agent.guard.yml      # Guardrails & permissions config
-  requirements.txt     # Dependencies
-  .env.example         # API key template
-  .gitignore
+agentvoy list              # List supported frameworks, models, and targets
 ```
 
 ## Architecture
 
 ```
-agentvoy/
+agentvoy/                        # TypeScript monorepo
   packages/
-    core/              # Types, config parser, framework adapters
-    cli/               # CLI tool (agentvoy create, init, validate)
-    create-agentvoy/   # npx create-agentvoy shorthand
+    core/                        # Types, config, adapters, deployers
+      src/
+        adapters/                # Framework adapters (openai, crewai, …)
+        deployers/               # Deployment adapters (docker, fly-io, …)
+        types.ts                 # Universal type system
+        config.ts                # agent.guard.yml parser
+    cli/                         # agentvoy CLI
+    create-agentvoy/             # npx create-agentvoy shorthand
+
+agentvoy-guard/                  # Python runtime enforcement package
 ```
-
-AgentVoy is a TypeScript monorepo. The core package provides:
-
-- **Type system** for universal agent configuration
-- **Config parser** for `agent.guard.yml` with validation
-- **Framework adapters** that generate project boilerplate for each framework
-- **Adapter registry** for plugging in new frameworks
 
 ## Contributing
 
-AgentVoy is open source under the Apache 2.0 license. Contributions welcome!
-
 ### Adding a new framework adapter
 
-1. Create a new file in `packages/core/src/adapters/`
-2. Implement the `FrameworkAdapter` interface
-3. Register it in `packages/core/src/adapters/index.ts`
+1. Create `packages/core/src/adapters/my-framework.ts`
+2. Implement `FrameworkAdapter` — `scaffold()` and `validateConfig()`
+3. Register in `packages/core/src/adapters/index.ts`
+4. Submit a PR
+
+### Adding a new deployment target
+
+1. Create `packages/core/src/deployers/my-target.ts`
+2. Implement `DeploymentAdapter` — `generateFiles()` and `validate()`
+3. Register in `packages/core/src/deployers/index.ts`
 4. Submit a PR
 
 ### Development
@@ -227,7 +316,12 @@ git clone https://github.com/agentvoy/agentvoy.git
 cd agentvoy
 npm install
 npm run build
-node packages/cli/dist/index.js --help
+
+# Smoke test agent mode
+node packages/cli/dist/index.js create test-project --yes
+
+# Smoke test app mode
+node packages/cli/dist/index.js create test-project --build-mode app --deploy-target docker --yes
 ```
 
 ## License
