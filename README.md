@@ -137,8 +137,8 @@ npx agentvoy validate
 | **CrewAI** | Python | Available |
 | **LangGraph** | Python | Available |
 | **Anthropic SDK** | Python | Available |
-| LlamaIndex | Python | Coming soon |
-| AutoGen | Python | Coming soon |
+| **LlamaIndex** | Python | Available |
+| **AutoGen** | Python | Available |
 
 ## Model Providers
 

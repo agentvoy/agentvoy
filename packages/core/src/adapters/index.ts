@@ -12,6 +12,8 @@ import { googleAdkAdapter } from "./google-adk.js";
 import { crewaiAdapter } from "./crewai.js";
 import { anthropicAdapter } from "./anthropic.js";
 import { langgraphAdapter } from "./langgraph.js";
+import { llamaindexAdapter } from "./llamaindex.js";
+import { autogenAdapter } from "./autogen.js";
 
 // Register built-in adapters
 registerAdapter(openaiAdapter);
@@ -19,3 +21,5 @@ registerAdapter(googleAdkAdapter);
 registerAdapter(crewaiAdapter);
 registerAdapter(anthropicAdapter);
 registerAdapter(langgraphAdapter);
+registerAdapter(llamaindexAdapter);
+registerAdapter(autogenAdapter);
