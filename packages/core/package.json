@@ -19,5 +19,21 @@
     "typescript": "^5.7.0",
     "@types/node": "^20.0.0"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "author": "Chinmay Murugkar <cthecm@gmail.com>",
+  "bugs": {
+    "url": "https://github.com/agentvoy/agentvoy/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "homepage": "https://agentvoy.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agentvoy/agentvoy.git"
+  },
   "license": "Apache-2.0"
 }

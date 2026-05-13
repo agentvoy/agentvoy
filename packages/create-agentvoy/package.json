@@ -25,5 +25,24 @@
     "@types/node": "^20.0.0",
     "@types/fs-extra": "^11.0.0"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "author": "Chinmay Murugkar <cthecm@gmail.com>",
+  "bugs": {
+    "url": "https://github.com/agentvoy/agentvoy/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "homepage": "https://agentvoy.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agentvoy/agentvoy.git"
+  },
+  "keywords": [
+    "ai", "agents", "llm", "scaffold", "cli", "create", "agentvoy"
+  ],
   "license": "Apache-2.0"
 }

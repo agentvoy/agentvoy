@@ -12,6 +12,9 @@ import { createCommand } from "./commands/create.js";
 import { initCommand } from "./commands/init.js";
 import { validateCommand } from "./commands/validate.js";
 import { listCommand } from "./commands/list.js";
+import pkg from "../package.json";
+
+const { version } = pkg;
 
 const program = new Command();
 
@@ -20,7 +23,7 @@ program
   .description(
     "The universal agent development platform. Scaffold, configure, and guard AI agents across any framework."
   )
-  .version("0.1.0");
+  .version(version);
 
 program.addCommand(createCommand);
 program.addCommand(initCommand);
