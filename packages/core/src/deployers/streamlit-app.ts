@@ -18,10 +18,10 @@ export function generateStreamlitApp(config: StreamlitConfig): string {
   const pipelineSection =
     agentMode === "multi"
       ? `
-    if data.get("stages"):
-        with st.expander("Pipeline stages", expanded=False):
-            for stage in data["stages"]:
-                st.write(f"✓ {stage}")
+                if data.get("stages"):
+                    with st.expander("Pipeline stages", expanded=False):
+                        for stage in data["stages"]:
+                            st.write(f"\\u2713 {stage}")
 `
       : "";
 
