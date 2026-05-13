@@ -56,21 +56,23 @@ jobs:
       - name: Test list command
         run: node packages/cli/dist/index.js list
 
-      - name: Scaffold and verify all frameworks
+      - name: Scaffold and verify all frameworks (agent mode)
         run: |
           REPO_ROOT="$(pwd)"
           CLI="node $REPO_ROOT/packages/cli/dist/index.js"
           OUTDIR="$(mktemp -d)"
 
           cd "$OUTDIR"
-          $CLI create test-openai    --framework openai     --provider openai     --model gpt-4o                    --yes
-          $CLI create test-google    --framework google-adk --provider google     --model gemini-2.0-flash          --yes
-          $CLI create test-crewai    --framework crewai     --provider openai     --model gpt-4o                    --yes
-          $CLI create test-anthropic --framework anthropic  --provider anthropic  --model claude-sonnet-4-20250514  --yes
-          $CLI create test-langgraph --framework langgraph  --provider openai     --model gpt-4o                    --yes
+          $CLI create test-openai     --framework openai      --provider openai     --model gpt-4o                    --yes
+          $CLI create test-google     --framework google-adk  --provider google     --model gemini-2.0-flash          --yes
+          $CLI create test-crewai     --framework crewai      --provider openai     --model gpt-4o                    --yes
+          $CLI create test-anthropic  --framework anthropic   --provider anthropic  --model claude-sonnet-4-20250514  --yes
+          $CLI create test-langgraph  --framework langgraph   --provider openai     --model gpt-4o                    --yes
+          $CLI create test-llamaindex --framework llamaindex  --provider openai     --model gpt-4o                    --yes
+          $CLI create test-autogen    --framework autogen     --provider openai     --model gpt-4o                    --yes
 
-          # All frameworks must have agent.guard.yml and requirements.txt
-          for dir in test-openai test-google test-crewai test-anthropic test-langgraph; do
+          # Projects are named {name}-agent/ in agent mode
+          for dir in test-openai-agent test-google-agent test-crewai-agent test-anthropic-agent test-langgraph-agent test-llamaindex-agent test-autogen-agent; do
             echo "Checking $OUTDIR/$dir..."
             ls -la "$OUTDIR/$dir/"
             test -f "$OUTDIR/$dir/agent.guard.yml" || { echo "MISSING agent.guard.yml in $dir"; exit 1; }
@@ -79,8 +81,30 @@ jobs:
           done
 
           # Frameworks that use run.py (Google ADK uses 'adk run' instead)
-          for dir in test-openai test-crewai test-anthropic test-langgraph; do
+          for dir in test-openai-agent test-crewai-agent test-anthropic-agent test-langgraph-agent test-llamaindex-agent test-autogen-agent; do
             test -f "$OUTDIR/$dir/run.py" || { echo "MISSING run.py in $dir"; exit 1; }
           done
 
           echo "All frameworks verified successfully"
+
+      - name: Scaffold and verify app mode (docker)
+        run: |
+          REPO_ROOT="$(pwd)"
+          CLI="node $REPO_ROOT/packages/cli/dist/index.js"
+          OUTDIR="$(mktemp -d)"
+
+          cd "$OUTDIR"
+          $CLI create test-app --framework openai --provider openai --model gpt-4o \
+            --build-mode app --agent-mode single --deploy-target docker --yes
+
+          # App mode produces {name}-app/
+          DIR="$OUTDIR/test-app-app"
+          echo "Checking $DIR..."
+          ls -la "$DIR/"
+          test -f "$DIR/agent.guard.yml"     || { echo "MISSING agent.guard.yml"; exit 1; }
+          test -f "$DIR/requirements.txt"    || { echo "MISSING requirements.txt"; exit 1; }
+          test -f "$DIR/server.py"           || { echo "MISSING server.py"; exit 1; }
+          test -f "$DIR/streamlit_app.py"    || { echo "MISSING streamlit_app.py"; exit 1; }
+          test -f "$DIR/Dockerfile"          || { echo "MISSING Dockerfile"; exit 1; }
+          test -f "$DIR/src/agents/agent.py" || { echo "MISSING src/agents/agent.py"; exit 1; }
+          echo "App mode OK"
