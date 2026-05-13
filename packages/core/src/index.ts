@@ -33,6 +33,14 @@ export type {
   ValidationError,
   ValidationWarning,
   ProjectConfig,
+  BuildMode,
+  AgentMode,
+  DeploymentTarget,
+  DeploymentAdapter,
+  DeployConfig,
+  CloudConfig,
+  DeploymentFiles,
+  DeployValidationResult,
 } from "./types.js";
 
 // Config
@@ -52,3 +60,17 @@ export {
   listFrameworks,
   hasAdapter,
 } from "./adapters/index.js";
+
+// Deployers
+export {
+  registerDeployer,
+  getDeployer,
+  listDeployers,
+  listTargets,
+  hasDeployer,
+  mapGuardToCloudConfig,
+  describeGuardMapping,
+  generateServerPy,
+  generateStreamlitApp,
+  generatePipelinePy,
+} from "./deployers/index.js";

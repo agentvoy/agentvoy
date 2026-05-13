@@ -13,6 +13,7 @@ import type {
   GeneratedFile,
 } from "../types.js";
 import { generateDefaultConfig } from "../config.js";
+import { generateAppInfraFiles, appendAppRequirements, appPostInstallInstructions } from "./app-scaffold.js";
 
 export const googleAdkAdapter: FrameworkAdapter = {
   name: "google-adk",
@@ -20,54 +21,42 @@ export const googleAdkAdapter: FrameworkAdapter = {
   language: "python",
 
   async scaffold(config: ScaffoldConfig): Promise<ScaffoldResult> {
+    const isApp = config.buildMode === "app";
     const agentDir = config.projectName.replace(/-/g, "_");
+    const agentNames = config.agentNames ?? ["agent"];
+    const files: GeneratedFile[] = [];
 
-    const files: GeneratedFile[] = [
-      {
-        path: `${agentDir}/__init__.py`,
-        content: "",
-      },
-      {
-        path: `${agentDir}/agent.py`,
-        content: generateAgentFile(config),
-      },
-      {
-        path: `${agentDir}/tools.py`,
-        content: generateToolsFile(config),
-      },
-      {
-        path: "requirements.txt",
-        content: generateRequirements(),
-      },
-      {
-        path: ".env.example",
-        content: "GOOGLE_API_KEY=your-api-key-here\n",
-      },
-      {
-        path: "agent.guard.yml",
-        content: generateDefaultConfig(
-          config.projectName,
-          "google",
-          config.model.model || "gemini-2.0-flash"
-        ),
-      },
-    ];
+    if (isApp) {
+      for (const agentName of agentNames) {
+        files.push({ path: `src/agents/${agentName}/__init__.py`, content: "" });
+        files.push({ path: `src/agents/${agentName}/agent.py`, content: generateAgentFile(config) });
+        files.push({ path: `src/agents/${agentName}/tools.py`, content: generateToolsFile(config) });
+      }
+      for (const f of generateAppInfraFiles(config)) files.push(f);
+    } else {
+      files.push({ path: `${agentDir}/__init__.py`, content: "" });
+      files.push({ path: `${agentDir}/agent.py`, content: generateAgentFile(config) });
+      files.push({ path: `${agentDir}/tools.py`, content: generateToolsFile(config) });
+    }
+
+    const baseReqs = `google-adk>=0.5.0\npython-dotenv>=1.0.0\nagentvoy-guard>=0.1.0\n`;
+    files.push({ path: "requirements.txt", content: isApp ? appendAppRequirements(baseReqs) : baseReqs });
+    files.push({ path: ".env.example", content: "GOOGLE_API_KEY=your-api-key-here\n" });
+    files.push({
+      path: "agent.guard.yml",
+      content: generateDefaultConfig(config.projectName, "google", config.model.model || "gemini-2.0-flash"),
+    });
 
     return {
       files,
       dependencies: {},
       devDependencies: {},
-      scripts: {
-        start: `adk run ${agentDir}`,
-        web: `adk web ${agentDir}`,
-      },
-      postInstallInstructions: [
-        "pip install -r requirements.txt",
-        "cp .env.example .env",
-        "Add your GOOGLE_API_KEY to .env",
-        `adk run ${agentDir}`,
-        `Or use the web UI: adk web ${agentDir}`,
-      ],
+      scripts: isApp
+        ? { start: "uvicorn server:app --reload --port 8080" }
+        : { start: `adk run ${agentDir}`, web: `adk web ${agentDir}` },
+      postInstallInstructions: isApp
+        ? appPostInstallInstructions("GOOGLE_API_KEY")
+        : ["pip install -r requirements.txt", "cp .env.example .env", "Add your GOOGLE_API_KEY to .env", `adk run ${agentDir}`, `Or use the web UI: adk web ${agentDir}`],
     };
   },
 

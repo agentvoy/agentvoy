@@ -4,7 +4,7 @@
 
 import { Command } from "commander";
 import chalk from "chalk";
-import { listAdapters } from "@agentvoy/core";
+import { listAdapters, listDeployers } from "@agentvoy/core";
 
 export const listCommand = new Command("list")
   .description("List supported frameworks and model providers")
@@ -37,6 +37,16 @@ export const listCommand = new Command("list")
       console.log(
         `  ${chalk.cyan(p.name.padEnd(15))} ${p.display} — ${chalk.dim(p.models)}`
       );
+    }
+
+    console.log("");
+    console.log(chalk.bold("  Deployment Targets:"));
+    console.log("");
+
+    const deployers = listDeployers();
+    for (const d of deployers) {
+      const cli = d.requiredCLI ? chalk.dim(` (requires: ${d.requiredCLI})`) : "";
+      console.log(`  ${chalk.cyan(d.target.padEnd(20))} ${d.displayName}${cli}`);
     }
     console.log("");
   });

@@ -13,6 +13,7 @@ import type {
   GeneratedFile,
 } from "../types.js";
 import { generateDefaultConfig } from "../config.js";
+import { generateAppInfraFiles, appendAppRequirements, appPostInstallInstructions } from "./app-scaffold.js";
 
 export const langgraphAdapter: FrameworkAdapter = {
   name: "langgraph",
@@ -20,54 +21,40 @@ export const langgraphAdapter: FrameworkAdapter = {
   language: "python",
 
   async scaffold(config: ScaffoldConfig): Promise<ScaffoldResult> {
-    const files: GeneratedFile[] = [
-      {
-        path: "agent.py",
-        content: generateAgentFile(config),
-      },
-      {
-        path: "tools.py",
-        content: generateToolsFile(),
-      },
-      {
-        path: "state.py",
-        content: generateStateFile(config),
-      },
-      {
-        path: "run.py",
-        content: generateRunFile(config),
-      },
-      {
-        path: "requirements.txt",
-        content: generateRequirements(config),
-      },
-      {
-        path: ".env.example",
-        content: generateEnvExample(config),
-      },
-      {
-        path: "agent.guard.yml",
-        content: generateDefaultConfig(
-          config.projectName,
-          "langgraph",
-          config.model.model || "gpt-4o"
-        ),
-      },
-    ];
+    const isApp = config.buildMode === "app";
+    const agentNames = config.agentNames ?? ["agent"];
+    const files: GeneratedFile[] = [];
+
+    if (isApp) {
+      for (const agentName of agentNames) {
+        files.push({ path: `src/agents/${agentName}.py`, content: generateAgentFile(config, agentName) });
+        files.push({ path: `src/agents/${agentName}_state.py`, content: generateStateFile(config, agentName) });
+      }
+      files.push({ path: "src/tools/tools.py", content: generateToolsFile() });
+      for (const f of generateAppInfraFiles(config)) files.push(f);
+    } else {
+      files.push({ path: "agent.py", content: generateAgentFile(config, "agent") });
+      files.push({ path: "tools.py", content: generateToolsFile() });
+      files.push({ path: "state.py", content: generateStateFile(config, "agent") });
+      files.push({ path: "run.py", content: generateRunFile(config) });
+    }
+
+    const baseReqs = generateRequirements(config);
+    files.push({ path: "requirements.txt", content: isApp ? appendAppRequirements(baseReqs) : baseReqs });
+    files.push({ path: ".env.example", content: generateEnvExample(config) });
+    files.push({
+      path: "agent.guard.yml",
+      content: generateDefaultConfig(config.projectName, "langgraph", config.model.model || "gpt-4o"),
+    });
 
     return {
       files,
       dependencies: {},
       devDependencies: {},
-      scripts: {
-        start: "python run.py",
-      },
-      postInstallInstructions: [
-        "pip install -r requirements.txt",
-        "cp .env.example .env",
-        `Add your ${getApiKeyEnv(config)} to .env`,
-        "python run.py",
-      ],
+      scripts: { start: isApp ? "uvicorn server:app --reload --port 8080" : "python run.py" },
+      postInstallInstructions: isApp
+        ? appPostInstallInstructions(getApiKeyEnv(config))
+        : ["pip install -r requirements.txt", "cp .env.example .env", `Add your ${getApiKeyEnv(config)} to .env`, "python run.py"],
     };
   },
 
@@ -132,7 +119,7 @@ function getLLMClass(config: ScaffoldConfig): string {
   return classMap[config.model.provider] || "ChatOpenAI";
 }
 
-function generateAgentFile(config: ScaffoldConfig): string {
+function generateAgentFile(config: ScaffoldConfig, _agentName = "agent"): string {
   const model = config.model.model || "gpt-4o";
   const maxIterations = config.guardrails?.behavior?.max_iterations || 20;
   const llmImport = getLLMImport(config);
@@ -219,7 +206,7 @@ def run_agent(prompt: str) -> str:
 `;
 }
 
-function generateStateFile(_config: ScaffoldConfig): string {
+function generateStateFile(_config: ScaffoldConfig, _agentName = "agent"): string {
   return `"""
 Agent state definition for LangGraph.
 """

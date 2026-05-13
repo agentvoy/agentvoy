@@ -13,6 +13,7 @@ import type {
   GeneratedFile,
 } from "../types.js";
 import { generateDefaultConfig } from "../config.js";
+import { generateAppInfraFiles, appendAppRequirements, appPostInstallInstructions } from "./app-scaffold.js";
 
 export const crewaiAdapter: FrameworkAdapter = {
   name: "crewai",
@@ -20,58 +21,40 @@ export const crewaiAdapter: FrameworkAdapter = {
   language: "python",
 
   async scaffold(config: ScaffoldConfig): Promise<ScaffoldResult> {
-    const files: GeneratedFile[] = [
-      {
-        path: "crew.py",
-        content: generateCrewFile(config),
-      },
-      {
-        path: "agents.py",
-        content: generateAgentsFile(config),
-      },
-      {
-        path: "tasks.py",
-        content: generateTasksFile(config),
-      },
-      {
-        path: "tools.py",
-        content: generateToolsFile(),
-      },
-      {
-        path: "run.py",
-        content: generateRunFile(config),
-      },
-      {
-        path: "requirements.txt",
-        content: generateRequirements(),
-      },
-      {
-        path: ".env.example",
-        content: generateEnvExample(config),
-      },
-      {
-        path: "agent.guard.yml",
-        content: generateDefaultConfig(
-          config.projectName,
-          config.model.provider,
-          config.model.model
-        ),
-      },
-    ];
+    const isApp = config.buildMode === "app";
+    const files: GeneratedFile[] = [];
+
+    if (isApp) {
+      // In app mode, expose a run_agent() entry point via crew
+      files.push({ path: "src/agents/crew.py", content: generateCrewFile(config, true) });
+      files.push({ path: "src/agents/agents.py", content: generateAgentsFile(config) });
+      files.push({ path: "src/agents/tasks.py", content: generateTasksFile(config) });
+      files.push({ path: "src/tools/tools.py", content: generateToolsFile() });
+      for (const f of generateAppInfraFiles(config)) files.push(f);
+    } else {
+      files.push({ path: "crew.py", content: generateCrewFile(config, false) });
+      files.push({ path: "agents.py", content: generateAgentsFile(config) });
+      files.push({ path: "tasks.py", content: generateTasksFile(config) });
+      files.push({ path: "tools.py", content: generateToolsFile() });
+      files.push({ path: "run.py", content: generateRunFile(config) });
+    }
+
+    const baseReqs = `crewai>=0.80.0\npython-dotenv>=1.0.0\nagentvoy-guard>=0.1.0\n`;
+    files.push({ path: "requirements.txt", content: isApp ? appendAppRequirements(baseReqs) : baseReqs });
+    files.push({ path: ".env.example", content: generateEnvExample(config) });
+    files.push({
+      path: "agent.guard.yml",
+      content: generateDefaultConfig(config.projectName, config.model.provider, config.model.model),
+    });
 
     return {
       files,
       dependencies: {},
       devDependencies: {},
-      scripts: {
-        start: "python run.py",
-      },
-      postInstallInstructions: [
-        "pip install -r requirements.txt",
-        "cp .env.example .env",
-        "Add your API key to .env",
-        "python run.py",
-      ],
+      scripts: { start: isApp ? "uvicorn server:app --reload --port 8080" : "python run.py" },
+      postInstallInstructions: isApp
+        ? appPostInstallInstructions("OPENAI_API_KEY")
+        : ["pip install -r requirements.txt", "cp .env.example .env", "Add your API key to .env", "python run.py"],
     };
   },
 
@@ -99,7 +82,7 @@ export const crewaiAdapter: FrameworkAdapter = {
   },
 };
 
-function generateCrewFile(config: ScaffoldConfig): string {
+function generateCrewFile(config: ScaffoldConfig, _isApp = false): string {
   return `"""
 ${config.projectName} Crew — Built with AgentVoy
 https://github.com/agentvoy

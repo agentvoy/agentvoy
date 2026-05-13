@@ -13,6 +13,7 @@ import type {
   GeneratedFile,
 } from "../types.js";
 import { generateDefaultConfig } from "../config.js";
+import { generateAppInfraFiles, appendAppRequirements, appPostInstallInstructions } from "./app-scaffold.js";
 
 export const openaiAdapter: FrameworkAdapter = {
   name: "openai",
@@ -20,50 +21,56 @@ export const openaiAdapter: FrameworkAdapter = {
   language: "python",
 
   async scaffold(config: ScaffoldConfig): Promise<ScaffoldResult> {
-    const files: GeneratedFile[] = [
-      {
-        path: "agent.py",
-        content: generateAgentFile(config),
-      },
-      {
-        path: "tools.py",
-        content: generateToolsFile(config),
-      },
-      {
-        path: "run.py",
-        content: generateRunFile(config),
-      },
-      {
-        path: "requirements.txt",
-        content: generateRequirements(),
-      },
-      {
-        path: ".env.example",
-        content: "OPENAI_API_KEY=your-api-key-here\n",
-      },
-      {
-        path: "agent.guard.yml",
-        content: generateDefaultConfig(
-          config.projectName,
-          config.model.provider,
-          config.model.model
-        ),
-      },
-    ];
+    const isApp = config.buildMode === "app";
+    const isMulti = isApp && config.agentMode === "multi";
+    const agentNames = config.agentNames ?? ["agent"];
+
+    const files: GeneratedFile[] = [];
+
+    if (isApp) {
+      // src/agents/ — one file per agent
+      for (const agentName of agentNames) {
+        files.push({
+          path: `src/agents/${agentName}.py`,
+          content: generateAgentFile(config, agentName),
+        });
+      }
+      // src/tools/tools.py
+      files.push({ path: "src/tools/tools.py", content: generateToolsFile(config) });
+      // Common src/ infrastructure files
+      for (const f of generateAppInfraFiles(config)) files.push(f);
+    } else {
+      files.push({ path: "agent.py", content: generateAgentFile(config, "agent") });
+      files.push({ path: "tools.py", content: generateToolsFile(config) });
+      files.push({ path: "run.py", content: generateRunFile(config) });
+    }
+
+    files.push({
+      path: "requirements.txt",
+      content: generateRequirements(isApp),
+    });
+    files.push({
+      path: ".env.example",
+      content: "OPENAI_API_KEY=your-api-key-here\n",
+    });
+    files.push({
+      path: "agent.guard.yml",
+      content: generateDefaultConfig(config.projectName, config.model.provider, config.model.model),
+    });
 
     return {
       files,
       dependencies: {},
       devDependencies: {},
-      scripts: {
-        start: "python run.py",
-      },
-      postInstallInstructions: [
-        "pip install -r requirements.txt",
-        "cp .env.example .env",
-        "Add your OPENAI_API_KEY to .env",
-        "python run.py",
-      ],
+      scripts: { start: isApp ? "uvicorn server:app --reload --port 8080" : "python run.py" },
+      postInstallInstructions: isApp
+        ? appPostInstallInstructions("OPENAI_API_KEY")
+        : [
+            "pip install -r requirements.txt",
+            "cp .env.example .env",
+            "Add your OPENAI_API_KEY to .env",
+            "python run.py",
+          ],
     };
   },
 
@@ -89,17 +96,18 @@ export const openaiAdapter: FrameworkAdapter = {
   },
 };
 
-function generateAgentFile(config: ScaffoldConfig): string {
+function generateAgentFile(config: ScaffoldConfig, agentName: string): string {
   const guardConfig = config.guardrails?.behavior;
   const maxTurns = guardConfig?.max_iterations || 20;
+  const isApp = config.buildMode === "app";
+  const toolsImport = isApp ? "from src.tools.tools import get_tools" : "from tools import get_tools";
 
   return `"""
-${config.projectName} — Built with AgentVoy
-https://github.com/agentvoy
+${agentName} agent — Part of ${config.projectName} (Built with AgentVoy)
 """
 
 from agents import Agent, Runner
-from tools import get_tools
+${toolsImport}
 
 
 def create_agent() -> Agent:
@@ -107,7 +115,7 @@ def create_agent() -> Agent:
     tools = get_tools()
 
     agent = Agent(
-        name="${config.projectName}",
+        name="${agentName}",
         instructions="""You are a helpful AI assistant.
 
 Follow these guidelines:
@@ -218,9 +226,7 @@ if __name__ == "__main__":
 `;
 }
 
-function generateRequirements(): string {
-  return `openai-agents>=0.1.0
-python-dotenv>=1.0.0
-agentvoy-guard>=0.1.0
-`;
+function generateRequirements(isApp = false): string {
+  const base = `openai-agents>=0.1.0\npython-dotenv>=1.0.0\nagentvoy-guard>=0.1.0\n`;
+  return isApp ? appendAppRequirements(base) : base;
 }

@@ -13,6 +13,7 @@ import type {
   GeneratedFile,
 } from "../types.js";
 import { generateDefaultConfig } from "../config.js";
+import { generateAppInfraFiles, appendAppRequirements, appPostInstallInstructions } from "./app-scaffold.js";
 
 export const anthropicAdapter: FrameworkAdapter = {
   name: "anthropic",
@@ -20,50 +21,38 @@ export const anthropicAdapter: FrameworkAdapter = {
   language: "python",
 
   async scaffold(config: ScaffoldConfig): Promise<ScaffoldResult> {
-    const files: GeneratedFile[] = [
-      {
-        path: "agent.py",
-        content: generateAgentFile(config),
-      },
-      {
-        path: "tools.py",
-        content: generateToolsFile(config),
-      },
-      {
-        path: "run.py",
-        content: generateRunFile(config),
-      },
-      {
-        path: "requirements.txt",
-        content: generateRequirements(),
-      },
-      {
-        path: ".env.example",
-        content: "ANTHROPIC_API_KEY=your-api-key-here\n",
-      },
-      {
-        path: "agent.guard.yml",
-        content: generateDefaultConfig(
-          config.projectName,
-          "anthropic",
-          config.model.model || "claude-sonnet-4-20250514"
-        ),
-      },
-    ];
+    const isApp = config.buildMode === "app";
+    const agentNames = config.agentNames ?? ["agent"];
+    const files: GeneratedFile[] = [];
+
+    if (isApp) {
+      for (const agentName of agentNames) {
+        files.push({ path: `src/agents/${agentName}.py`, content: generateAgentFile(config, agentName) });
+      }
+      files.push({ path: "src/tools/tools.py", content: generateToolsFile(config) });
+      for (const f of generateAppInfraFiles(config)) files.push(f);
+    } else {
+      files.push({ path: "agent.py", content: generateAgentFile(config, "agent") });
+      files.push({ path: "tools.py", content: generateToolsFile(config) });
+      files.push({ path: "run.py", content: generateRunFile(config) });
+    }
+
+    const baseReqs = `anthropic>=0.40.0\npython-dotenv>=1.0.0\nagentvoy-guard>=0.1.0\n`;
+    files.push({ path: "requirements.txt", content: isApp ? appendAppRequirements(baseReqs) : baseReqs });
+    files.push({ path: ".env.example", content: "ANTHROPIC_API_KEY=your-api-key-here\n" });
+    files.push({
+      path: "agent.guard.yml",
+      content: generateDefaultConfig(config.projectName, "anthropic", config.model.model || "claude-sonnet-4-20250514"),
+    });
 
     return {
       files,
       dependencies: {},
       devDependencies: {},
-      scripts: {
-        start: "python run.py",
-      },
-      postInstallInstructions: [
-        "pip install -r requirements.txt",
-        "cp .env.example .env",
-        "Add your ANTHROPIC_API_KEY to .env",
-        "python run.py",
-      ],
+      scripts: { start: isApp ? "uvicorn server:app --reload --port 8080" : "python run.py" },
+      postInstallInstructions: isApp
+        ? appPostInstallInstructions("ANTHROPIC_API_KEY")
+        : ["pip install -r requirements.txt", "cp .env.example .env", "Add your ANTHROPIC_API_KEY to .env", "python run.py"],
     };
   },
 
@@ -89,9 +78,13 @@ export const anthropicAdapter: FrameworkAdapter = {
   },
 };
 
-function generateAgentFile(config: ScaffoldConfig): string {
+function generateAgentFile(config: ScaffoldConfig, _agentName = "agent"): string {
   const model = config.model.model || "claude-sonnet-4-20250514";
   const maxIterations = config.guardrails?.behavior?.max_iterations || 20;
+  const isApp = config.buildMode === "app";
+  const toolsImport = isApp
+    ? "from src.tools.tools import get_tools, process_tool_call"
+    : "from tools import get_tools, process_tool_call";
 
   return `"""
 ${config.projectName} — Built with AgentVoy
@@ -99,7 +92,7 @@ https://github.com/agentvoy
 """
 
 import anthropic
-from tools import get_tools, process_tool_call
+${toolsImport}
 
 
 def create_client() -> anthropic.Anthropic:

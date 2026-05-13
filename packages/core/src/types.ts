@@ -153,11 +153,71 @@ export interface FrameworkAdapter {
   getDependencies(): Record<string, string>;
 }
 
+// ─── Build Modes ──────────────────────────────────────────────────
+
+export type BuildMode = "agent" | "app";
+export type AgentMode = "single" | "multi";
+
+// ─── Deployment ───────────────────────────────────────────────────
+
+export type DeploymentTarget =
+  | "docker"
+  | "fly-io"
+  | "railway"
+  | "gcp-cloud-run"
+  | "aws-lambda";
+
+export interface DeploymentAdapter {
+  readonly target: DeploymentTarget;
+  readonly displayName: string;
+  readonly requiredCLI?: string;
+
+  generateFiles(config: DeployConfig): Promise<DeploymentFiles>;
+  validate(config: DeployConfig): Promise<DeployValidationResult>;
+}
+
+export interface DeployConfig {
+  projectName: string;
+  projectDir: string;
+  target: DeploymentTarget;
+  framework: Framework;
+  guard: AgentGuardConfig;
+  port: number;
+  envVars: string[];
+  cloudConfig?: CloudConfig;
+}
+
+export interface CloudConfig {
+  region?: string;
+  memory?: string;
+  timeout?: string;
+  minInstances?: number;
+  maxInstances?: number;
+}
+
+export interface DeploymentFiles {
+  files: GeneratedFile[];
+  instructions: string[];
+}
+
+export interface DeployValidationResult {
+  valid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationWarning[];
+  missingTools?: string[];
+}
+
+// ─── Scaffold Config ──────────────────────────────────────────────
+
 export interface ScaffoldConfig {
   projectName: string;
   projectDir: string;
   framework: Framework;
   model: ModelConfig;
+  buildMode: BuildMode;
+  agentMode?: AgentMode;
+  agentNames?: string[];
+  deployTarget?: DeploymentTarget;
   guardrails?: GuardrailsConfig;
   auth?: AuthConfig;
   features?: string[];
