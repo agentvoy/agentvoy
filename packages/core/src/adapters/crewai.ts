@@ -220,18 +220,25 @@ def main():
     print("\\n🚀 ${config.projectName} — Powered by AgentVoy")
     print("=" * 50)
 
+    from agentvoy_guard import Guard
+    guard = Guard.from_config()
+
     topic = input("\\nEnter a topic to research: ")
     if not topic.strip():
         print("No topic provided. Exiting.")
         return
 
-    crew = create_crew()
-    result = crew.kickoff(inputs={"topic": topic})
+    with guard.session() as session:
+        session.check_input(topic)
+        crew = create_crew()
+        result = crew.kickoff(inputs={"topic": topic})
+        session.check_output(str(result))
 
     print("\\n" + "=" * 50)
     print("RESULT:")
     print("=" * 50)
     print(result)
+    print(f"\\n[guard] {guard.last_summary}")
 
 
 if __name__ == "__main__":
@@ -243,6 +250,7 @@ function generateRequirements(): string {
   return `crewai>=0.80.0
 crewai-tools>=0.14.0
 python-dotenv>=1.0.0
+agentvoy-guard>=0.1.0
 `;
 }
 

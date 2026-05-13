@@ -123,14 +123,25 @@ Follow these guidelines:
 
 
 async def run_agent(prompt: str) -> str:
-    """Run the agent with the given prompt."""
-    agent = create_agent()
-    result = await Runner.run(
-        agent,
-        prompt,
-        max_turns=${maxTurns},
-    )
-    return result.final_output
+    """Run the agent with the given prompt, enforcing agent.guard.yml at runtime."""
+    from agentvoy_guard import Guard
+    guard = Guard.from_config()
+
+    with guard.session() as session:
+        session.check_input(prompt)
+
+        agent = create_agent()
+        result = await Runner.run(
+            agent,
+            prompt,
+            max_turns=${maxTurns},
+        )
+
+        final = result.final_output or ""
+        session.check_output(final)
+
+    print(f"[guard] {guard.last_summary}")
+    return final
 `;
 }
 
@@ -210,5 +221,6 @@ if __name__ == "__main__":
 function generateRequirements(): string {
   return `openai-agents>=0.1.0
 python-dotenv>=1.0.0
+agentvoy-guard>=0.1.0
 `;
 }

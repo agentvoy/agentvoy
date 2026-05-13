@@ -288,9 +288,12 @@ Run the ${config.projectName} agent.
 """
 
 from dotenv import load_dotenv
+from agentvoy_guard import Guard
 from agent import run_agent
 
 load_dotenv()
+
+guard = Guard.from_config()
 
 
 def main():
@@ -308,8 +311,12 @@ def main():
                 continue
 
             print("\\nThinking...\\n")
-            result = run_agent(prompt)
+            with guard.session() as session:
+                session.check_input(prompt)
+                result = run_agent(prompt)
+                session.check_output(result)
             print(f"\\n{result}\\n")
+            print(f"[guard] {guard.last_summary}")
         except KeyboardInterrupt:
             print("\\n\\nGoodbye!")
             break
@@ -327,6 +334,7 @@ langchain>=0.3.0
 langchain-core>=0.3.0
 ${langchainPkg}>=0.2.0
 python-dotenv>=1.0.0
+agentvoy-guard>=0.1.0
 `;
 }
 

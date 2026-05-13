@@ -108,48 +108,50 @@ def create_client() -> anthropic.Anthropic:
 
 
 def run_agent(prompt: str) -> str:
-    """Run the agent with an agentic loop."""
+    """Run the agent with an agentic loop, enforcing agent.guard.yml at runtime."""
+    from agentvoy_guard import Guard
+    guard = Guard.from_config()
+
     client = create_client()
     tools = get_tools()
     messages = [{"role": "user", "content": prompt}]
 
-    iteration = 0
-    max_iterations = ${maxIterations}
+    with guard.session() as session:
+        session.check_input(prompt)
 
-    while iteration < max_iterations:
-        iteration += 1
+        while True:
+            session.tick()
 
-        response = client.messages.create(
-            model="${model}",
-            max_tokens=8096,
-            tools=tools,
-            messages=messages,
-        )
+            response = client.messages.create(
+                model="${model}",
+                max_tokens=8096,
+                tools=tools,
+                messages=messages,
+            )
 
-        # Add assistant response to messages
-        messages.append({"role": "assistant", "content": response.content})
+            session.track_usage(response.usage)
+            messages.append({"role": "assistant", "content": response.content})
 
-        # If no tool calls, we're done
-        if response.stop_reason == "end_turn":
-            # Extract final text response
-            for block in response.content:
-                if hasattr(block, "text"):
-                    return block.text
-            return "Done."
+            if response.stop_reason == "end_turn":
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        session.check_output(block.text)
+                        print(f"[guard] {guard.last_summary}")
+                        return block.text
+                return "Done."
 
-        # Process tool calls
-        if response.stop_reason == "tool_use":
-            tool_results = []
-            for block in response.content:
-                if block.type == "tool_use":
-                    result = process_tool_call(block.name, block.input)
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": str(result),
-                    })
-
-            messages.append({"role": "user", "content": tool_results})
+            if response.stop_reason == "tool_use":
+                tool_results = []
+                for block in response.content:
+                    if block.type == "tool_use":
+                        session.tick_tool()
+                        result = process_tool_call(block.name, block.input)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": str(result),
+                        })
+                messages.append({"role": "user", "content": tool_results})
 
     return "Max iterations reached."
 `;
@@ -264,5 +266,6 @@ if __name__ == "__main__":
 function generateRequirements(): string {
   return `anthropic>=0.40.0
 python-dotenv>=1.0.0
+agentvoy-guard>=0.1.0
 `;
 }

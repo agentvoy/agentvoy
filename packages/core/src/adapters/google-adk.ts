@@ -163,5 +163,6 @@ def read_file(path: str) -> dict:
 function generateRequirements(): string {
   return `google-adk>=1.0.0
 python-dotenv>=1.0.0
+agentvoy-guard>=0.1.0
 `;
 }
