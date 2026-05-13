@@ -25,5 +25,14 @@
     "@types/node": "^20.0.0",
     "typescript": "^5.7.0"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "keywords": [
+    "ai", "agents", "llm", "scaffold", "cli", "openai", "anthropic",
+    "langgraph", "crewai", "google-adk", "guardrails", "agentvoy"
+  ],
+  "homepage": "https://agentvoy.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agentvoy/agentvoy.git"
+  }
 }
