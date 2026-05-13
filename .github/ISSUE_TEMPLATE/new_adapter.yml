@@ -1,0 +1,44 @@
+name: New Framework Adapter
+description: Request or propose a new agent framework adapter
+labels: ["adapter", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Want AgentVoy to support a new framework? Great!
+        Adding an adapter is straightforward — see [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+  - type: input
+    id: framework
+    attributes:
+      label: Framework name
+      placeholder: "LlamaIndex, AutoGen, Haystack..."
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: Framework URL / docs
+      placeholder: "https://..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - Python
+        - TypeScript/JavaScript
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Contribution
+      options:
+        - label: I'm willing to implement this adapter myself
+        - label: I'd like someone else to implement it

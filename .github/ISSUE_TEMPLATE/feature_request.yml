@@ -1,0 +1,42 @@
+name: Feature Request
+description: Suggest a new framework adapter, guardrail, or feature
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping make AgentVoy better!
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: What kind of feature?
+      options:
+        - New framework adapter
+        - New model provider
+        - Guardrails enhancement
+        - CLI improvement
+        - agentvoy-guard (Python runtime)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      placeholder: Describe the problem or gap you're running into.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      placeholder: What would you like to see?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
