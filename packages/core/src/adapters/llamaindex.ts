@@ -155,7 +155,7 @@ Follow these guidelines:
     return agent
 
 
-async def run_agent(prompt: str) -> str:
+def run_agent(prompt: str) -> str:
     """Run the agent with the given prompt, enforcing agent.guard.yml at runtime."""
     from agentvoy_guard import Guard
     guard = Guard.from_config()

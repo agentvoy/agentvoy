@@ -27,10 +27,12 @@ export const googleAdkAdapter: FrameworkAdapter = {
     const files: GeneratedFile[] = [];
 
     if (isApp) {
+      // Standard run_agent entry point for server.py
+      files.push({ path: "src/agents/agent.py", content: generateAppAgentEntry(config) });
       for (const agentName of agentNames) {
-        files.push({ path: `src/agents/${agentName}/__init__.py`, content: "" });
-        files.push({ path: `src/agents/${agentName}/agent.py`, content: generateAgentFile(config) });
-        files.push({ path: `src/agents/${agentName}/tools.py`, content: generateToolsFile(config) });
+        files.push({ path: `src/agents/${agentName}_adk/__init__.py`, content: "" });
+        files.push({ path: `src/agents/${agentName}_adk/agent.py`, content: generateAgentFile(config) });
+        files.push({ path: `src/agents/${agentName}_adk/tools.py`, content: generateToolsFile(config) });
       }
       for (const f of generateAppInfraFiles(config)) files.push(f);
     } else {
@@ -81,6 +83,46 @@ export const googleAdkAdapter: FrameworkAdapter = {
     };
   },
 };
+
+function generateAppAgentEntry(config: ScaffoldConfig): string {
+  return `"""
+${config.projectName} — run_agent entry point for server.py
+Wraps the Google ADK agent as a single callable.
+"""
+
+from dotenv import load_dotenv
+load_dotenv()
+
+
+def run_agent(prompt: str) -> str:
+    """Run the Google ADK agent with the given prompt, enforcing agent.guard.yml."""
+    from agentvoy_guard import Guard
+    from google.adk.runners import Runner
+    from google.adk.sessions import InMemorySessionService
+    from src.agents.agent_adk.agent import root_agent
+
+    guard = Guard.from_config()
+
+    with guard.session() as session:
+        session.check_input(prompt)
+
+        session_service = InMemorySessionService()
+        adk_session = session_service.create_session(app_name="${config.projectName}", user_id="user")
+        runner = Runner(agent=root_agent, app_name="${config.projectName}", session_service=session_service)
+
+        from google.genai import types
+        content = types.Content(role="user", parts=[types.Part(text=prompt)])
+        final = ""
+        for event in runner.run(user_id="user", session_id=adk_session.id, new_message=content):
+            if event.is_final_response() and event.content and event.content.parts:
+                final = event.content.parts[0].text or ""
+
+        session.check_output(final)
+
+    print(f"[guard] {guard.last_summary}")
+    return final
+`;
+}
 
 function generateAgentFile(config: ScaffoldConfig): string {
   const model = config.model.model || "gemini-2.0-flash";

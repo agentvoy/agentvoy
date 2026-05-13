@@ -8,15 +8,14 @@ interface ApiWrapperConfig {
   port: number;
 }
 
-function getFrameworkImport(framework: Framework, agentMode: AgentMode, agentNames?: string[]): string {
+function getFrameworkImport(framework: Framework, agentMode: AgentMode): string {
   if (agentMode === "multi") {
     return `from src.pipeline import run_pipeline`;
   }
-  // Single agent — all frameworks expose run_agent from src/agents/agent.py
   return `from src.agents.agent import run_agent`;
 }
 
-function getInvokeCall(agentMode: AgentMode): string {
+function getInvokeCall(framework: Framework, agentMode: AgentMode): string {
   if (agentMode === "multi") {
     return `run_pipeline(request.prompt)`;
   }
@@ -33,9 +32,9 @@ function getResultExtract(agentMode: AgentMode): string {
 }
 
 export function generateServerPy(config: ApiWrapperConfig): string {
-  const { projectName, framework, agentMode, agentNames, port } = config;
-  const frameworkImport = getFrameworkImport(framework, agentMode, agentNames);
-  const invokeCall = getInvokeCall(agentMode);
+  const { projectName, framework, agentMode, port } = config;
+  const frameworkImport = getFrameworkImport(framework, agentMode);
+  const invokeCall = getInvokeCall(framework, agentMode);
   const resultExtract = getResultExtract(agentMode);
 
   return `"""

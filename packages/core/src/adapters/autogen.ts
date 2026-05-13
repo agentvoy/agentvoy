@@ -169,17 +169,15 @@ Follow these guidelines:
     return assistant
 
 
-async def run_agent(prompt: str) -> str:
+def run_agent(prompt: str) -> str:
     """Run the agent with the given prompt, enforcing agent.guard.yml at runtime."""
+    import asyncio
     from agentvoy_guard import Guard
     guard = Guard.from_config()
 
-    with guard.session() as session:
-        session.check_input(prompt)
-
+    async def _run():
         assistant = create_agent()
 
-        # UserProxyAgent drives the conversation and terminates on completion
         user_proxy = UserProxyAgent(
             name="user_proxy",
             human_input_mode="NEVER",
@@ -194,13 +192,15 @@ async def run_agent(prompt: str) -> str:
             max_turns=2,
         )
 
-        # Extract last assistant message
         chat_history = user_proxy.chat_messages.get(assistant, [])
-        final = next(
+        return next(
             (m["content"] for m in reversed(chat_history) if m.get("role") == "assistant"),
             "",
         )
 
+    with guard.session() as session:
+        session.check_input(prompt)
+        final = asyncio.run(_run())
         session.check_output(final)
 
     print(f"[guard] {guard.last_summary}")

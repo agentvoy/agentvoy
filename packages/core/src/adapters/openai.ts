@@ -130,22 +130,24 @@ Follow these guidelines:
     return agent
 
 
-async def run_agent(prompt: str) -> str:
+def run_agent(prompt: str) -> str:
     """Run the agent with the given prompt, enforcing agent.guard.yml at runtime."""
+    import asyncio
     from agentvoy_guard import Guard
     guard = Guard.from_config()
 
-    with guard.session() as session:
-        session.check_input(prompt)
-
+    async def _run():
         agent = create_agent()
         result = await Runner.run(
             agent,
             prompt,
             max_turns=${maxTurns},
         )
+        return result.final_output or ""
 
-        final = result.final_output or ""
+    with guard.session() as session:
+        session.check_input(prompt)
+        final = asyncio.run(_run())
         session.check_output(final)
 
     print(f"[guard] {guard.last_summary}")

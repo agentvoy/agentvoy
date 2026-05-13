@@ -25,10 +25,10 @@ export const crewaiAdapter: FrameworkAdapter = {
     const files: GeneratedFile[] = [];
 
     if (isApp) {
-      // In app mode, expose a run_agent() entry point via crew
+      files.push({ path: "src/agents/agent.py", content: generateAppAgentEntry(config) });
       files.push({ path: "src/agents/crew.py", content: generateCrewFile(config, true) });
-      files.push({ path: "src/agents/agents.py", content: generateAgentsFile(config) });
-      files.push({ path: "src/agents/tasks.py", content: generateTasksFile(config) });
+      files.push({ path: "src/agents/agents.py", content: generateAgentsFile(config, true) });
+      files.push({ path: "src/agents/tasks.py", content: generateTasksFile(config, true) });
       files.push({ path: "src/tools/tools.py", content: generateToolsFile() });
       for (const f of generateAppInfraFiles(config)) files.push(f);
     } else {
@@ -82,15 +82,48 @@ export const crewaiAdapter: FrameworkAdapter = {
   },
 };
 
-function generateCrewFile(config: ScaffoldConfig, _isApp = false): string {
+function generateAppAgentEntry(config: ScaffoldConfig): string {
+  return `"""
+${config.projectName} — run_agent entry point for server.py
+Wraps the CrewAI crew as a single callable.
+"""
+
+from dotenv import load_dotenv
+load_dotenv()
+
+
+def run_agent(prompt: str) -> str:
+    """Run the CrewAI crew with the given prompt, enforcing agent.guard.yml."""
+    from agentvoy_guard import Guard
+    guard = Guard.from_config()
+
+    with guard.session() as session:
+        session.check_input(prompt)
+
+        from src.agents.crew import create_crew
+        crew = create_crew()
+        result = crew.kickoff(inputs={"topic": prompt})
+        final = str(result)
+
+        session.check_output(final)
+
+    print(f"[guard] {guard.last_summary}")
+    return final
+`;
+}
+
+function generateCrewFile(config: ScaffoldConfig, isApp = false): string {
+  const agentsImport = isApp ? "from src.agents.agents import researcher, writer" : "from agents import researcher, writer";
+  const tasksImport = isApp ? "from src.agents.tasks import research_task, write_task" : "from tasks import research_task, write_task";
+
   return `"""
 ${config.projectName} Crew — Built with AgentVoy
 https://github.com/agentvoy
 """
 
 from crewai import Crew, Process
-from agents import researcher, writer
-from tasks import research_task, write_task
+${agentsImport}
+${tasksImport}
 
 
 def create_crew() -> Crew:
@@ -105,15 +138,16 @@ def create_crew() -> Crew:
 `;
 }
 
-function generateAgentsFile(config: ScaffoldConfig): string {
+function generateAgentsFile(config: ScaffoldConfig, isApp = false): string {
   const model = config.model.model || "gpt-4o";
+  const toolsImport = isApp ? "from src.tools.tools import search_tool" : "from tools import search_tool";
 
   return `"""
 Agent definitions for ${config.projectName}.
 """
 
 from crewai import Agent
-from tools import search_tool
+${toolsImport}
 
 
 researcher = Agent(
@@ -139,13 +173,15 @@ accuracy.""",
 `;
 }
 
-function generateTasksFile(config: ScaffoldConfig): string {
+function generateTasksFile(config: ScaffoldConfig, isApp = false): string {
+  const agentsImport = isApp ? "from src.agents.agents import researcher, writer" : "from agents import researcher, writer";
+
   return `"""
 Task definitions for ${config.projectName}.
 """
 
 from crewai import Task
-from agents import researcher, writer
+${agentsImport}
 
 
 research_task = Task(
