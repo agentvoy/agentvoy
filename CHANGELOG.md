@@ -2,6 +2,23 @@
 
 All notable changes to AgentVoy are documented here.
 
+## [0.4.0] - 2026-05-13
+
+### Added
+- Two-path `agentvoy create` flow: **Agent** (local dev) or **App** (deployable with API + UI + cloud)
+- App mode scaffolds `src/agents/`, `src/tools/`, `src/config/`, FastAPI `server.py`, Streamlit `streamlit_app.py`
+- Multi-agent pipeline support: sequential orchestration with named agents (researcher → writer → reviewer)
+- `agentvoy deploy` command: add deployment config to any existing agent project
+- **5 deployment targets**: Docker, Fly.io, Railway, GCP Cloud Run, AWS Lambda
+- `agent.guard.yml` → cloud config mapping: timeout → HEALTHCHECK, cost_limit → memory, allow_shell → non-root user
+- New CLI flags: `--build-mode`, `--agent-mode`, `--deploy-target` for fully non-interactive scripting
+- `@agentvoy/core` deployer infrastructure: registry, api-wrapper, streamlit generator, pipeline generator, guard-mapper
+
+### Changed
+- Project folders now named `{name}-agent/` or `{name}-app/` based on chosen build mode
+- All 5 framework adapters support app mode with `src/` directory structure
+- `agentvoy list` now shows deployment targets alongside frameworks and models
+
 ## [0.3.1] - 2025-05-12
 
 ### Added
