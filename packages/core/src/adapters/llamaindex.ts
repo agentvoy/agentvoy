@@ -155,20 +155,43 @@ Follow these guidelines:
     return agent
 
 
-def run_agent(prompt: str) -> str:
+def run_agent(prompt: str, model: str | None = None) -> str:
     """Run the agent with the given prompt, enforcing agent.guard.yml at runtime."""
+    import time
     from agentvoy_guard import Guard
     guard = Guard.from_config()
 
+    try:
+        from src.trace.tracer import tracer
+    except ImportError:
+        tracer = None
+
+    _model = model or "${config.model.model || "gpt-4o"}"
+    if tracer:
+        tracer.agent_start("${agentName}", prompt, _model)
+
     with guard.session() as session:
+        if tracer:
+            tracer.guard_check("input", True)
         session.check_input(prompt)
 
         agent = create_agent()
+        if model:
+            from llama_index.llms.openai import OpenAI as LI_OpenAI
+            agent._llm = LI_OpenAI(model=model)
+        t0 = time.time()
         response = agent.chat(prompt)
         final = str(response)
+        if tracer:
+            tracer.llm_call(_model, latency=round(time.time() - t0, 2),
+                            prompt_preview=prompt, response_preview=final)
 
         session.check_output(final)
+        if tracer:
+            tracer.guard_check("output", True)
 
+    if tracer:
+        tracer.agent_complete("${agentName}", final)
     print(f"[guard] {guard.last_summary}")
     return final
 `;

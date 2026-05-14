@@ -100,28 +100,46 @@ def create_client() -> anthropic.Anthropic:
     return anthropic.Anthropic()
 
 
-def run_agent(prompt: str) -> str:
+def run_agent(prompt: str, model: str | None = None) -> str:
     """Run the agent with an agentic loop, enforcing agent.guard.yml at runtime."""
+    import time
     from agentvoy_guard import Guard
     guard = Guard.from_config()
+
+    try:
+        from src.trace.tracer import tracer
+    except ImportError:
+        tracer = None
+
+    _model = model or "${model}"
+    if tracer:
+        tracer.agent_start("${config.projectName}", prompt, _model)
 
     client = create_client()
     tools = get_tools()
     messages = [{"role": "user", "content": prompt}]
 
     with guard.session() as session:
+        if tracer:
+            tracer.guard_check("input", True)
         session.check_input(prompt)
 
         while True:
             session.tick()
 
+            t0 = time.time()
             response = client.messages.create(
-                model="${model}",
+                model=_model,
                 max_tokens=8096,
                 tools=tools,
                 messages=messages,
             )
 
+            latency = round(time.time() - t0, 2)
+            tokens_in = getattr(response.usage, 'input_tokens', 0)
+            tokens_out = getattr(response.usage, 'output_tokens', 0)
+            if tracer:
+                tracer.llm_call(_model, tokens_in=tokens_in, tokens_out=tokens_out, latency=latency)
             session.track_usage(response.usage)
             messages.append({"role": "assistant", "content": response.content})
 
@@ -129,6 +147,9 @@ def run_agent(prompt: str) -> str:
                 for block in response.content:
                     if hasattr(block, "text"):
                         session.check_output(block.text)
+                        if tracer:
+                            tracer.guard_check("output", True)
+                            tracer.agent_complete("${config.projectName}", block.text)
                         print(f"[guard] {guard.last_summary}")
                         return block.text
                 return "Done."
@@ -138,7 +159,10 @@ def run_agent(prompt: str) -> str:
                 for block in response.content:
                     if block.type == "tool_use":
                         session.tick_tool()
+                        t_tool = time.time()
                         result = process_tool_call(block.name, block.input)
+                        if tracer:
+                            tracer.tool_call(block.name, str(block.input), str(result), round(time.time() - t_tool, 2))
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,

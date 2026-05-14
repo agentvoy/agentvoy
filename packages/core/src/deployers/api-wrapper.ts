@@ -17,9 +17,9 @@ function getFrameworkImport(framework: Framework, agentMode: AgentMode): string 
 
 function getInvokeCall(framework: Framework, agentMode: AgentMode): string {
   if (agentMode === "multi") {
-    return `run_pipeline(request.prompt)`;
+    return `run_pipeline(request.prompt, model=request.model)`;
   }
-  return `run_agent(request.prompt)`;
+  return `run_agent(request.prompt, model=request.model)`;
 }
 
 function getResultExtract(agentMode: AgentMode): string {
@@ -47,15 +47,21 @@ Run:
 Endpoints:
     POST /run    — send a prompt, get a response
     GET  /health — health check
+    GET  /dev    — AgentVoy DevTools dashboard
+    WS   /ws/trace — real-time trace event stream
 """
 import os
-from fastapi import FastAPI, HTTPException
+import json
+import asyncio
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 load_dotenv()
 
 ${frameworkImport}
+from src.trace.tracer import tracer
 
 app = FastAPI(
     title="${projectName}",
@@ -66,6 +72,7 @@ app = FastAPI(
 
 class AgentRequest(BaseModel):
     prompt: str
+    model: str | None = None
     session_id: str | None = None
 
 
@@ -75,18 +82,55 @@ class AgentResponse(BaseModel):
 
 
 @app.post("/run")
-async def run(request: AgentRequest) -> AgentResponse:
+def run(request: AgentRequest) -> AgentResponse:
     try:
         result = ${invokeCall}
 ${resultExtract}
         return AgentResponse(response=response, guard_summary=guard_summary)
     except Exception as e:
+        tracer.error(str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "agent": "${projectName}"}
+
+
+# ── DevTools ─────────────────────────────────────────────
+
+@app.get("/dev", response_class=HTMLResponse)
+async def devtools():
+    """Serve the AgentVoy DevTools dashboard."""
+    dashboard_path = os.path.join(os.path.dirname(__file__), "devtools.html")
+    if os.path.exists(dashboard_path):
+        with open(dashboard_path) as f:
+            return HTMLResponse(f.read())
+    return HTMLResponse("<h1>DevTools dashboard not found</h1><p>Regenerate with: agentvoy deploy</p>")
+
+
+@app.websocket("/ws/trace")
+async def trace_ws(websocket: WebSocket):
+    """Stream trace events to the DevTools dashboard via WebSocket."""
+    await websocket.accept()
+    queue = tracer.subscribe()
+    try:
+        while True:
+            event = await queue.get()
+            from dataclasses import asdict
+            await websocket.send_text(json.dumps(asdict(event)))
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        tracer.unsubscribe(queue)
+
+
+@app.get("/dev/events")
+async def dev_events():
+    """Return all trace events for the current session."""
+    return {"events": tracer.get_events_json(), "summary": tracer.get_summary()}
 
 
 if __name__ == "__main__":

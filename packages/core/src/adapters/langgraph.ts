@@ -141,10 +141,10 @@ from state import AgentState
 from tools import get_tools
 
 
-def create_graph():
+def create_graph(model_override: str | None = None):
     """Build the agent state graph."""
     tools = get_tools()
-    llm = ${llmClass}(model="${model}").bind_tools(tools)
+    llm = ${llmClass}(model=model_override or "${model}").bind_tools(tools)
     tool_node = ToolNode(tools)
 
     def should_continue(state: AgentState) -> str:
@@ -185,21 +185,38 @@ def create_graph():
     return graph.compile()
 
 
-def run_agent(prompt: str) -> str:
+def run_agent(prompt: str, model: str | None = None) -> str:
     """Run the agent graph with a user prompt."""
-    app = create_graph()
+    import time
+
+    try:
+        from src.trace.tracer import tracer
+    except ImportError:
+        tracer = None
+
+    _model = model or "${model}"
+    if tracer:
+        tracer.agent_start("${config.projectName}", prompt, _model)
+
+    app = create_graph(model_override=model)
 
     initial_state = {
         "messages": [HumanMessage(content=prompt)],
         "iteration": 0,
     }
 
+    t0 = time.time()
     final_state = app.invoke(initial_state)
+    if tracer:
+        tracer.llm_call(_model, latency=round(time.time() - t0, 2),
+                        prompt_preview=prompt)
     messages = final_state["messages"]
 
     # Return the last AI message text
     for msg in reversed(messages):
         if hasattr(msg, "content") and isinstance(msg.content, str):
+            if tracer:
+                tracer.agent_complete("${config.projectName}", msg.content)
             return msg.content
 
     return "Done."

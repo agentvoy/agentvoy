@@ -3,6 +3,8 @@ export { mapGuardToCloudConfig, describeGuardMapping } from "./guard-mapper.js";
 export { generateServerPy } from "./api-wrapper.js";
 export { generateStreamlitApp } from "./streamlit-app.js";
 export { generatePipelinePy } from "./pipeline.js";
+export { generateTracerPy } from "./tracer.js";
+export { generateDevtoolsDashboard } from "./devtools-dashboard.js";
 
 import { registerDeployer } from "./registry.js";
 import { dockerAdapter } from "./docker.js";

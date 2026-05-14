@@ -32,8 +32,12 @@ Streamlit app that talks to the FastAPI server.
 Run (with server already running on port ${port}):
     streamlit run streamlit_app.py
 """
+import os
 import streamlit as st
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 API_URL = "http://localhost:${port}"
 
@@ -42,10 +46,173 @@ st.set_page_config(
     page_icon="🤖",
     layout="centered",
 )
-st.title("${projectName}")
-st.caption("Powered by AgentVoy")
 
-${agentMode === "multi" && pipelineSteps ? `with st.sidebar:\n    st.subheader("Pipeline")\n    for stage in [${pipelineSteps}]:\n        st.write(f"• {stage}")` : ""}
+# --- Custom CSS ---
+st.markdown("""
+<style>
+    /* --- Glassmorphism background --- */
+    .stApp {
+        background: linear-gradient(135deg, #0a0e1a 0%, #0d1526 25%, #111d35 50%, #0d1526 75%, #0a0e1a 100%) !important;
+    }
+    .stApp::before {
+        content: "";
+        position: fixed;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background:
+            radial-gradient(ellipse at 20% 50%, rgba(108, 99, 255, 0.08) 0%, transparent 50%),
+            radial-gradient(ellipse at 80% 20%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+            radial-gradient(ellipse at 60% 80%, rgba(108, 99, 255, 0.05) 0%, transparent 50%);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    /* Narrow sidebar */
+    [data-testid="stSidebar"] > div:first-child {
+        width: 220px !important;
+    }
+    /* Glass sidebar */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg,
+            rgba(13, 21, 38, 0.85) 0%,
+            rgba(17, 29, 53, 0.80) 50%,
+            rgba(13, 21, 38, 0.85) 100%) !important;
+        backdrop-filter: blur(20px) saturate(1.2);
+        -webkit-backdrop-filter: blur(20px) saturate(1.2);
+        border-right: 1px solid rgba(108, 99, 255, 0.1);
+    }
+    [data-testid="stSidebar"] .stMarkdown h2 {
+        color: #6C63FF;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    /* Glass chat bubbles */
+    .stChatMessage {
+        border-radius: 14px;
+        background: rgba(17, 29, 53, 0.5) !important;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(108, 99, 255, 0.08);
+    }
+
+    /* Glass chat input */
+    [data-testid="stChatInput"] {
+        background: rgba(17, 29, 53, 0.6) !important;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(108, 99, 255, 0.12) !important;
+        border-radius: 14px !important;
+    }
+
+    .agentvoy-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 4px 0 12px 0;
+    }
+    .agentvoy-brand svg {
+        flex-shrink: 0;
+    }
+    .agentvoy-brand-text {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #FAFAFA;
+        letter-spacing: 0.02em;
+    }
+    .agentvoy-header {
+        margin-bottom: 0;
+    }
+    .agentvoy-header h1 {
+        margin: 0;
+        font-size: 1.8rem;
+    }
+    .agentvoy-footer {
+        position: fixed;
+        bottom: 6px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 999;
+        font-size: 0.72rem;
+        color: rgba(250, 250, 250, 0.35);
+        letter-spacing: 0.03em;
+    }
+    .agentvoy-footer a {
+        color: rgba(108, 99, 255, 0.6);
+        text-decoration: none;
+    }
+    .agentvoy-footer a:hover {
+        color: #6C63FF;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="agentvoy-header">
+    <h1>${projectName}</h1>
+</div>
+""", unsafe_allow_html=True)
+
+# --- Model picker: auto-detect available API keys ---
+MODELS: dict[str, str] = {}
+if os.getenv("OPENAI_API_KEY"):
+    MODELS["GPT-4o"] = "gpt-4o"
+    MODELS["GPT-4o Mini"] = "gpt-4o-mini"
+    MODELS["GPT-4.1"] = "gpt-4.1"
+    MODELS["GPT-4.1 Mini"] = "gpt-4.1-mini"
+if os.getenv("ANTHROPIC_API_KEY"):
+    MODELS["Claude Sonnet 4"] = "claude-sonnet-4-20250514"
+    MODELS["Claude Haiku 3.5"] = "claude-haiku-4-5-20251001"
+if os.getenv("GOOGLE_API_KEY"):
+    MODELS["Gemini 2.0 Flash"] = "gemini-2.0-flash"
+    MODELS["Gemini 2.5 Pro"] = "gemini-2.5-pro-preview-05-06"
+
+with st.sidebar:
+    # --- AgentVoy branding with robot ---
+    st.markdown("""
+    <div class="agentvoy-brand">
+        <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Antenna -->
+            <line x1="50" y1="8" x2="50" y2="22" stroke="#6C63FF" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="50" cy="6" r="4" fill="#6C63FF"/>
+            <!-- Head -->
+            <rect x="22" y="22" width="56" height="42" rx="12" fill="#1A1D29" stroke="#6C63FF" stroke-width="2.5"/>
+            <!-- Eyes -->
+            <circle cx="38" cy="40" r="6" fill="#6C63FF">
+                <animate attributeName="r" values="6;4;6" dur="3s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="62" cy="40" r="6" fill="#6C63FF">
+                <animate attributeName="r" values="6;4;6" dur="3s" repeatCount="indefinite"/>
+            </circle>
+            <!-- Mouth -->
+            <rect x="36" y="52" width="28" height="4" rx="2" fill="#6C63FF" opacity="0.6"/>
+            <!-- Body -->
+            <rect x="30" y="68" width="40" height="22" rx="6" fill="#1A1D29" stroke="#6C63FF" stroke-width="2"/>
+            <!-- Arms -->
+            <rect x="12" y="70" width="14" height="6" rx="3" fill="#6C63FF" opacity="0.7"/>
+            <rect x="74" y="70" width="14" height="6" rx="3" fill="#6C63FF" opacity="0.7"/>
+        </svg>
+        <span class="agentvoy-brand-text">AgentVoy</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.subheader("Model")
+    if MODELS:
+        selected_label = st.selectbox("Choose model", list(MODELS.keys()), label_visibility="collapsed")
+        model_id = MODELS[selected_label]
+        st.caption(f"\`{model_id}\`")
+    else:
+        model_id = None
+        st.warning("No API keys found in .env")
+${agentMode === "multi" && pipelineSteps ? `\n    st.divider()\n    st.subheader("Pipeline")\n    for stage in [${pipelineSteps}]:\n        st.write(f"\\u2022 {stage}")` : ""}
+
+    st.divider()
+    if st.button("Clear chat", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -64,7 +231,7 @@ if prompt := st.chat_input("Ask your agent..."):
             try:
                 resp = requests.post(
                     f"{API_URL}/run",
-                    json={"prompt": prompt},
+                    json={"prompt": prompt, "model": model_id},
                     timeout=120,
                 )
                 resp.raise_for_status()
@@ -86,5 +253,8 @@ ${pipelineSection}
 
     if data.get("response"):
         st.session_state.messages.append({"role": "assistant", "content": data["response"]})
+
+# --- Powered by AgentVoy footer ---
+st.markdown('<div class="agentvoy-footer">Powered by <a href="https://agentvoy.com" target="_blank">AgentVoy</a></div>', unsafe_allow_html=True)
 `;
 }

@@ -13,11 +13,17 @@ export function generatePipelinePy(config: PipelineConfig): string {
     .map((name) => `from src.agents.${name} import run_agent as ${name}_agent`)
     .join("\n");
 
+  const totalStages = agentNames.length;
+
   const stages = agentNames
     .map((name, i) => {
       const inputVar = i === 0 ? "prompt" : `${agentNames[i - 1]}_result`;
       return `        # Stage ${i + 1}: ${name}
-        ${name}_result = ${name}_agent(${inputVar})
+        if tracer:
+            tracer.pipeline_stage("${name}", ${i}, ${totalStages}, "running")
+        ${name}_result = ${name}_agent(${inputVar}, model=model)
+        if tracer:
+            tracer.pipeline_stage("${name}", ${i}, ${totalStages}, "done")
         session.tick()`;
     })
     .join("\n\n");
@@ -35,17 +41,28 @@ from agentvoy_guard import Guard
 
 ${imports}
 
+try:
+    from src.trace.tracer import tracer
+except ImportError:
+    tracer = None
+
 guard = Guard.from_config()
 
 
-def run_pipeline(prompt: str) -> dict:
+def run_pipeline(prompt: str, model: str | None = None) -> dict:
     """Run all agents in sequence and return the final result."""
+    if tracer:
+        tracer.agent_start("pipeline", prompt, model or "default")
+
     with guard.session() as session:
         session.check_input(prompt)
 
 ${stages}
 
         session.check_output(str(${finalVar}))
+
+    if tracer:
+        tracer.agent_complete("pipeline", str(${finalVar}))
 
     return {
         "result": ${finalVar},

@@ -13,6 +13,7 @@ import { initCommand } from "./commands/init.js";
 import { validateCommand } from "./commands/validate.js";
 import { listCommand } from "./commands/list.js";
 import { deployCommand } from "./commands/deploy.js";
+import { devCommand } from "./commands/dev.js";
 import pkg from "../package.json";
 
 const { version } = pkg;
@@ -27,6 +28,7 @@ program
   .version(version);
 
 program.addCommand(createCommand);
+program.addCommand(devCommand);
 program.addCommand(deployCommand);
 program.addCommand(initCommand);
 program.addCommand(validateCommand);

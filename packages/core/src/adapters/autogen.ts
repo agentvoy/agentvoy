@@ -169,14 +169,26 @@ Follow these guidelines:
     return assistant
 
 
-def run_agent(prompt: str) -> str:
+def run_agent(prompt: str, model: str | None = None) -> str:
     """Run the agent with the given prompt, enforcing agent.guard.yml at runtime."""
     import asyncio
+    import time
     from agentvoy_guard import Guard
     guard = Guard.from_config()
 
+    try:
+        from src.trace.tracer import tracer
+    except ImportError:
+        tracer = None
+
+    _model = model or "${config.model.model || "gpt-4o"}"
+    if tracer:
+        tracer.agent_start("${agentName}", prompt, _model)
+
     async def _run():
         assistant = create_agent()
+        if model:
+            assistant.llm_config["config_list"][0]["model"] = model
 
         user_proxy = UserProxyAgent(
             name="user_proxy",
@@ -186,6 +198,7 @@ def run_agent(prompt: str) -> str:
             code_execution_config=False,
         )
 
+        t0 = time.time()
         await user_proxy.a_initiate_chat(
             assistant,
             message=prompt,
@@ -193,16 +206,26 @@ def run_agent(prompt: str) -> str:
         )
 
         chat_history = user_proxy.chat_messages.get(assistant, [])
-        return next(
+        final = next(
             (m["content"] for m in reversed(chat_history) if m.get("role") == "assistant"),
             "",
         )
+        if tracer:
+            tracer.llm_call(_model, latency=round(time.time() - t0, 2),
+                            prompt_preview=prompt, response_preview=final)
+        return final
 
     with guard.session() as session:
+        if tracer:
+            tracer.guard_check("input", True)
         session.check_input(prompt)
         final = asyncio.run(_run())
         session.check_output(final)
+        if tracer:
+            tracer.guard_check("output", True)
 
+    if tracer:
+        tracer.agent_complete("${agentName}", final)
     print(f"[guard] {guard.last_summary}")
     return final
 `;

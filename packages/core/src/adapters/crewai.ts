@@ -92,21 +92,46 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def run_agent(prompt: str) -> str:
+def run_agent(prompt: str, model: str | None = None) -> str:
     """Run the CrewAI crew with the given prompt, enforcing agent.guard.yml."""
+    import time
     from agentvoy_guard import Guard
     guard = Guard.from_config()
 
+    try:
+        from src.trace.tracer import tracer
+    except ImportError:
+        tracer = None
+
+    _model = model or "crewai"
+    if tracer:
+        tracer.agent_start("${config.projectName}", prompt, _model)
+
+    # Override model for all crew agents if specified
+    if model:
+        import os
+        os.environ["OPENAI_MODEL_NAME"] = model
+
     with guard.session() as session:
+        if tracer:
+            tracer.guard_check("input", True)
         session.check_input(prompt)
 
         from src.agents.crew import create_crew
+        t0 = time.time()
         crew = create_crew()
         result = crew.kickoff(inputs={"topic": prompt})
         final = str(result)
+        if tracer:
+            tracer.llm_call(_model, latency=round(time.time() - t0, 2),
+                            prompt_preview=prompt, response_preview=final)
 
         session.check_output(final)
+        if tracer:
+            tracer.guard_check("output", True)
 
+    if tracer:
+        tracer.agent_complete("${config.projectName}", final)
     print(f"[guard] {guard.last_summary}")
     return final
 `;

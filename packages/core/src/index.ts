@@ -73,4 +73,6 @@ export {
   generateServerPy,
   generateStreamlitApp,
   generatePipelinePy,
+  generateTracerPy,
+  generateDevtoolsDashboard,
 } from "./deployers/index.js";

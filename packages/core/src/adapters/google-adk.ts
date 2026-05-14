@@ -94,31 +94,61 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def run_agent(prompt: str) -> str:
+def run_agent(prompt: str, model: str | None = None) -> str:
     """Run the Google ADK agent with the given prompt, enforcing agent.guard.yml."""
+    import time
     from agentvoy_guard import Guard
     from google.adk.runners import Runner
     from google.adk.sessions import InMemorySessionService
+    from google.adk.agents import Agent as AdkAgent
     from src.agents.agent_adk.agent import root_agent
 
+    try:
+        from src.trace.tracer import tracer
+    except ImportError:
+        tracer = None
+
     guard = Guard.from_config()
+    _model = model or "${config.model.model || "gemini-2.0-flash"}"
+    if tracer:
+        tracer.agent_start("${config.projectName}", prompt, _model)
+
+    agent = root_agent
+    if model:
+        agent = AdkAgent(
+            name=root_agent.name,
+            model=model,
+            description=root_agent.description,
+            instruction=root_agent.instruction,
+            tools=root_agent.tools,
+        )
 
     with guard.session() as session:
+        if tracer:
+            tracer.guard_check("input", True)
         session.check_input(prompt)
 
         session_service = InMemorySessionService()
         adk_session = session_service.create_session(app_name="${config.projectName}", user_id="user")
-        runner = Runner(agent=root_agent, app_name="${config.projectName}", session_service=session_service)
+        runner = Runner(agent=agent, app_name="${config.projectName}", session_service=session_service)
 
         from google.genai import types
         content = types.Content(role="user", parts=[types.Part(text=prompt)])
         final = ""
+        t0 = time.time()
         for event in runner.run(user_id="user", session_id=adk_session.id, new_message=content):
             if event.is_final_response() and event.content and event.content.parts:
                 final = event.content.parts[0].text or ""
+        if tracer:
+            tracer.llm_call(_model, latency=round(time.time() - t0, 2),
+                            prompt_preview=prompt, response_preview=final)
 
         session.check_output(final)
+        if tracer:
+            tracer.guard_check("output", True)
 
+    if tracer:
+        tracer.agent_complete("${config.projectName}", final)
     print(f"[guard] {guard.last_summary}")
     return final
 `;

@@ -15,6 +15,7 @@ import {
   generateServerPy,
   generateStreamlitApp,
   generatePipelinePy,
+  generateDevtoolsDashboard,
   type Framework,
   type ModelProvider,
   type ModelConfig,
@@ -251,16 +252,24 @@ export const createCommand = new Command("create")
       if (buildMode === "app") {
         const port = 8080;
 
+        // crewai and google-adk handle multi-agent internally — server.py
+        // should import run_agent (single mode) instead of run_pipeline
+        const frameworkHandlesMultiAgent = ["crewai", "google-adk"].includes(framework);
+        const effectiveAgentMode = (agentMode === "multi" && frameworkHandlesMultiAgent) ? "single" as AgentMode : agentMode;
+
         // server.py
-        const serverPy = generateServerPy({ projectName, framework, agentMode, agentNames, port });
+        const serverPy = generateServerPy({ projectName, framework, agentMode: effectiveAgentMode, agentNames, port });
         writeFileSync(join(projectDir, "server.py"), serverPy);
 
         // streamlit_app.py
-        const streamlitApp = generateStreamlitApp({ projectName, agentMode, agentNames, port });
+        const streamlitApp = generateStreamlitApp({ projectName, agentMode: effectiveAgentMode, agentNames, port });
         writeFileSync(join(projectDir, "streamlit_app.py"), streamlitApp);
 
-        // pipeline.py for multi-agent
-        if (agentMode === "multi") {
+        // devtools.html
+        const devtoolsHtml = generateDevtoolsDashboard({ projectName, port });
+        writeFileSync(join(projectDir, "devtools.html"), devtoolsHtml);
+
+        if (agentMode === "multi" && !frameworkHandlesMultiAgent) {
           const pipelinePy = generatePipelinePy({ projectName, framework, agentNames });
           const srcDir = join(projectDir, "src");
           mkdirSync(srcDir, { recursive: true });

@@ -1,13 +1,19 @@
 /**
  * agentvoy deploy — Deploy an existing agent project to the cloud
+ *
+ * Supports two modes:
+ *   --dry-run (default for non-docker): generate deployment files only
+ *   (default for docker): build and run the container
+ *   fly-io: deploy to Fly.io via flyctl
  */
 
 import { Command } from "commander";
 import { select } from "@inquirer/prompts";
 import chalk from "chalk";
 import ora from "ora";
-import { writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
 import { resolve, join } from "node:path";
+import { spawnSync } from "node:child_process";
 import {
   listDeployers,
   getDeployer,
@@ -34,7 +40,7 @@ export const deployCommand = new Command("deploy")
   .option("--dry-run", "Generate deployment files without executing deploy")
   .action(async (options: DeployOptions) => {
     console.log("");
-    console.log(chalk.bold("  AgentVoy") + chalk.dim(" — Deploy your agent to the cloud"));
+    console.log(chalk.bold("  AgentVoy Deploy"));
     console.log("");
 
     const projectDir = resolve(process.cwd());
@@ -50,8 +56,9 @@ export const deployCommand = new Command("deploy")
       process.exit(1);
     }
 
-    // Detect framework from project structure (best-effort)
+    // Detect framework from project structure
     const framework = detectFramework(projectDir);
+    const projectName = guard.identity?.name || "agent";
 
     // Choose deployment target
     const deployers = listDeployers();
@@ -74,7 +81,7 @@ export const deployCommand = new Command("deploy")
 
       // Validate
       const validation = await deployer.validate({
-        projectName: guard.identity?.name || "agent",
+        projectName,
         projectDir,
         target,
         framework,
@@ -96,28 +103,26 @@ export const deployCommand = new Command("deploy")
 
       if (!existsSync(serverPath)) {
         const serverPy = generateServerPy({
-          projectName: guard.identity?.name || "agent",
+          projectName,
           framework,
           agentMode: "single",
           port,
         });
         writeFileSync(serverPath, serverPy);
-        spinner.text = "Generating deployment files... server.py";
       }
 
       if (!existsSync(streamlitPath)) {
         const streamlitApp = generateStreamlitApp({
-          projectName: guard.identity?.name || "agent",
+          projectName,
           agentMode: "single",
           port,
         });
         writeFileSync(streamlitPath, streamlitApp);
-        spinner.text = "Generating deployment files... streamlit_app.py";
       }
 
       // Generate target-specific files
       const result = await deployer.generateFiles({
-        projectName: guard.identity?.name || "agent",
+        projectName,
         projectDir,
         target,
         framework,
@@ -147,15 +152,161 @@ export const deployCommand = new Command("deploy")
         }
       }
 
-      // Show next steps
+      // Show generated files
       console.log("");
       console.log(chalk.bold("  Generated files:"));
-      if (!existsSync(join(projectDir, "server.py"))) console.log(chalk.dim("  server.py"));
-      if (!existsSync(join(projectDir, "streamlit_app.py"))) console.log(chalk.dim("  streamlit_app.py"));
       for (const file of result.files) {
         console.log(chalk.dim(`  ${file.path}`));
       }
 
+      // ── Actual deployment ──────────────────────────────────────
+      if (options.dryRun) {
+        console.log("");
+        console.log(chalk.dim("  --dry-run: skipping actual deployment"));
+        console.log("");
+        console.log(chalk.bold("  Next steps:"));
+        for (const instruction of result.instructions) {
+          console.log(chalk.dim(`  ${instruction}`));
+        }
+        console.log("");
+        return;
+      }
+
+      // Docker: build and run
+      if (target === "docker") {
+        console.log("");
+        const buildSpinner = ora("Building Docker image...").start();
+
+        const buildResult = spawnSync("docker", ["build", "-t", projectName, "."], {
+          cwd: projectDir,
+          stdio: "pipe",
+          encoding: "utf-8",
+        });
+
+        if (buildResult.status !== 0) {
+          buildSpinner.fail(chalk.red("Docker build failed"));
+          if (buildResult.stderr) console.error(chalk.dim(buildResult.stderr.slice(-500)));
+          console.log("");
+          console.log(chalk.dim("  Make sure Docker is installed and running."));
+          console.log("");
+          return;
+        }
+
+        buildSpinner.succeed(chalk.green(`Docker image built: ${projectName}`));
+
+        // Check for .env file to pass environment variables
+        const envFlag = existsSync(join(projectDir, ".env")) ? ["--env-file", ".env"] : [];
+
+        console.log("");
+        console.log(chalk.bold("  Starting container..."));
+        console.log(`  ${chalk.dim("Agent:")}    ${chalk.cyan(`http://localhost:${port}`)}`);
+        console.log(`  ${chalk.dim("DevTools:")} ${chalk.cyan(`http://localhost:${port}/dev`)}`);
+        console.log(`  ${chalk.dim("Health:")}   ${chalk.cyan(`http://localhost:${port}/health`)}`);
+        console.log("");
+        console.log(chalk.dim("  Press Ctrl+C to stop"));
+        console.log("");
+
+        const runResult = spawnSync("docker", [
+          "run", "--rm", "-p", `${port}:${port}`, ...envFlag, projectName,
+        ], {
+          cwd: projectDir,
+          stdio: "inherit",
+        });
+
+        if (runResult.status !== 0 && runResult.status !== null) {
+          console.log(chalk.red(`\n  Container exited with code ${runResult.status}`));
+        }
+        return;
+      }
+
+      // Fly.io: deploy via flyctl
+      if (target === "fly-io") {
+        console.log("");
+
+        // Check flyctl is installed
+        const flyCheck = spawnSync("flyctl", ["version"], { stdio: "pipe", encoding: "utf-8" });
+        if (flyCheck.status !== 0) {
+          console.log(chalk.red("  Error: flyctl not found."));
+          console.log(chalk.dim("  Install it: curl -L https://fly.io/install.sh | sh"));
+          console.log("");
+          return;
+        }
+
+        // Check logged in
+        const authCheck = spawnSync("flyctl", ["auth", "whoami"], { stdio: "pipe", encoding: "utf-8" });
+        if (authCheck.status !== 0) {
+          console.log(chalk.yellow("  Not logged in to Fly.io."));
+          console.log(chalk.dim("  Run: flyctl auth login"));
+          console.log("");
+          return;
+        }
+
+        console.log(chalk.dim(`  Logged in as: ${(authCheck.stdout || "").trim()}`));
+
+        // Set secrets from .env
+        const envPath = join(projectDir, ".env");
+        if (existsSync(envPath)) {
+          const envContent = readFileSync(envPath, "utf-8");
+          const secrets: string[] = [];
+          for (const line of envContent.split("\n")) {
+            const trimmed = line.trim();
+            if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
+              const [key] = trimmed.split("=", 1);
+              if (key.endsWith("_API_KEY") || key.endsWith("_KEY") || key.endsWith("_SECRET")) {
+                secrets.push(trimmed);
+              }
+            }
+          }
+          if (secrets.length > 0) {
+            const secretSpinner = ora("Setting secrets...").start();
+            const secretResult = spawnSync("flyctl", ["secrets", "set", ...secrets], {
+              cwd: projectDir,
+              stdio: "pipe",
+              encoding: "utf-8",
+            });
+            if (secretResult.status === 0) {
+              secretSpinner.succeed(chalk.green(`${secrets.length} secret(s) set`));
+            } else {
+              secretSpinner.warn(chalk.yellow("Could not set secrets (app may not exist yet)"));
+            }
+          }
+        }
+
+        // Deploy
+        const deploySpinner = ora("Deploying to Fly.io...").start();
+        deploySpinner.stop();
+        console.log("");
+
+        const deployResult = spawnSync("flyctl", ["deploy", "--ha=false"], {
+          cwd: projectDir,
+          stdio: "inherit",
+        });
+
+        if (deployResult.status === 0) {
+          console.log("");
+          console.log(chalk.green.bold("  Deployed successfully!"));
+
+          // Get app URL
+          const infoResult = spawnSync("flyctl", ["info"], {
+            cwd: projectDir,
+            stdio: "pipe",
+            encoding: "utf-8",
+          });
+          const hostname = (infoResult.stdout || "").match(/Hostname\s*=\s*(\S+)/)?.[1];
+          if (hostname) {
+            console.log(`  ${chalk.dim("App:")}      ${chalk.cyan(`https://${hostname}`)}`);
+            console.log(`  ${chalk.dim("DevTools:")} ${chalk.cyan(`https://${hostname}/dev`)}`);
+            console.log(`  ${chalk.dim("API:")}      ${chalk.cyan(`https://${hostname}/run`)}`);
+          }
+          console.log("");
+        } else {
+          console.log(chalk.red("\n  Deployment failed. Check the output above for details."));
+          console.log("");
+        }
+        return;
+      }
+
+      // Other targets: show instructions
       console.log("");
       console.log(chalk.bold("  Next steps:"));
       for (const instruction of result.instructions) {
@@ -171,23 +322,20 @@ export const deployCommand = new Command("deploy")
 
 /** Best-effort framework detection from project files */
 function detectFramework(projectDir: string): Framework {
-  const { existsSync } = require("node:fs");
-  const { join } = require("node:path");
-
   if (existsSync(join(projectDir, "crew.py")) || existsSync(join(projectDir, "src/agents/crew.py"))) return "crewai";
   if (existsSync(join(projectDir, "state.py"))) return "langgraph";
 
-  // Check requirements.txt for framework hints
   const reqPath = join(projectDir, "requirements.txt");
   if (existsSync(reqPath)) {
-    const { readFileSync } = require("node:fs");
     const reqs = readFileSync(reqPath, "utf-8");
     if (reqs.includes("google-adk")) return "google-adk";
     if (reqs.includes("crewai")) return "crewai";
     if (reqs.includes("langgraph")) return "langgraph";
+    if (reqs.includes("llama-index")) return "llamaindex";
+    if (reqs.includes("pyautogen")) return "autogen";
     if (reqs.includes("anthropic")) return "anthropic";
     if (reqs.includes("openai-agents")) return "openai";
   }
 
-  return "openai"; // safe default
+  return "openai";
 }

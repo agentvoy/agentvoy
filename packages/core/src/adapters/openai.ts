@@ -130,26 +130,53 @@ Follow these guidelines:
     return agent
 
 
-def run_agent(prompt: str) -> str:
+def run_agent(prompt: str, model: str | None = None) -> str:
     """Run the agent with the given prompt, enforcing agent.guard.yml at runtime."""
     import asyncio
+    import time
     from agentvoy_guard import Guard
     guard = Guard.from_config()
 
+    try:
+        from src.trace.tracer import tracer
+    except ImportError:
+        tracer = None
+
+    _model = model or "${config.model.model || "gpt-4o"}"
+    if tracer:
+        tracer.agent_start("${agentName}", prompt, _model)
+
     async def _run():
         agent = create_agent()
+        if model:
+            agent = Agent(
+                name=agent.name,
+                instructions=agent.instructions,
+                model=model,
+                tools=agent.tools,
+            )
+        t0 = time.time()
         result = await Runner.run(
             agent,
             prompt,
             max_turns=${maxTurns},
         )
+        if tracer:
+            tracer.llm_call(_model, latency=round(time.time() - t0, 2),
+                            prompt_preview=prompt, response_preview=result.final_output or "")
         return result.final_output or ""
 
     with guard.session() as session:
+        if tracer:
+            tracer.guard_check("input", True)
         session.check_input(prompt)
         final = asyncio.run(_run())
         session.check_output(final)
+        if tracer:
+            tracer.guard_check("output", True)
 
+    if tracer:
+        tracer.agent_complete("${agentName}", final)
     print(f"[guard] {guard.last_summary}")
     return final
 `;
