@@ -1,7 +1,7 @@
 {
   "name": "agentvoy",
   "version": "0.4.0",
-  "description": "CLI for AgentVoy — scaffold, configure, and run AI agents across any framework",
+  "description": "CLI for AgentVoy — scaffold, develop, and deploy AI agents across any framework",
   "bin": {
     "agentvoy": "dist/index.js"
   },
@@ -38,8 +38,9 @@
   },
   "license": "Apache-2.0",
   "keywords": [
-    "ai", "agents", "llm", "scaffold", "cli", "openai", "anthropic",
-    "langgraph", "crewai", "google-adk", "guardrails", "agentvoy"
+    "ai", "agents", "llm", "scaffold", "cli", "deploy", "devtools",
+    "openai", "anthropic", "langgraph", "crewai", "google-adk",
+    "llamaindex", "autogen", "guardrails", "agentvoy"
   ],
   "homepage": "https://agentvoy.com",
   "repository": {

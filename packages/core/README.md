@@ -1,6 +1,6 @@
 # @agentvoy/core
 
-Core engine for [AgentVoy](https://agentvoy.com) — the universal AI agent development platform.
+Core engine for [AgentVoy](https://agentvoy.com) — the universal AI agent platform.
 
 [![npm version](https://img.shields.io/npm/v/@agentvoy/core.svg)](https://www.npmjs.com/package/@agentvoy/core)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/agentvoy/agentvoy/blob/main/LICENSE)
@@ -9,11 +9,11 @@ Core engine for [AgentVoy](https://agentvoy.com) — the universal AI agent deve
 
 This package provides the foundation for AgentVoy:
 
-- **Framework adapter interface** — `FrameworkAdapter` type that every framework plugin implements
-- **Adapter registry** — register and look up adapters by name
+- **Framework adapters** — OpenAI Agents SDK, Google ADK, CrewAI, LangGraph, Anthropic SDK, LlamaIndex, AutoGen
+- **Deployment adapters** — Docker, Fly.io, Railway, GCP Cloud Run, AWS Lambda
+- **Code generators** — server.py (FastAPI + DevTools endpoints), streamlit_app.py (chat UI), tracer.py (execution tracing), devtools.html (dashboard), pipeline.py (multi-agent orchestration)
 - **Config parser** — parse and validate `agent.guard.yml`
-- **Default config generator** — generate guardrail configs for scaffolded projects
-- **Built-in adapters** — OpenAI Agents SDK, Google ADK, CrewAI, LangGraph, Anthropic SDK
+- **Guard-to-cloud mapper** — translate guardrail settings into deployment configuration
 
 ## Usage
 
@@ -48,6 +48,29 @@ export const myAdapter: FrameworkAdapter = {
 
   getDependencies() {
     return { "my-framework": ">=1.0.0" };
+  },
+};
+```
+
+If you're **building a custom deployment target**, implement the `DeploymentAdapter` interface:
+
+```typescript
+import type { DeploymentAdapter, DeployConfig, DeploymentFiles } from "@agentvoy/core";
+
+export const myTargetAdapter: DeploymentAdapter = {
+  target: "my-target",
+  displayName: "My Target",
+  requiredCLI: "my-cli",
+
+  async generateFiles(config: DeployConfig): Promise<DeploymentFiles> {
+    return {
+      files: [{ path: "deploy/config.yml", content: "..." }],
+      instructions: ["my-cli deploy"],
+    };
+  },
+
+  async validate(config: DeployConfig) {
+    return { valid: true, errors: [], warnings: [] };
   },
 };
 ```

@@ -1,7 +1,7 @@
 {
   "name": "@agentvoy/core",
   "version": "0.4.0",
-  "description": "Core engine for AgentVoy — guardrails config parser, framework adapters, and agent runtime utilities",
+  "description": "Core engine for AgentVoy — framework adapters, deployment targets, DevTools generators, and guardrails config",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

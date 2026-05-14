@@ -9,6 +9,7 @@
 <p align="center">
   <a href="#quick-start">Quick Start</a> |
   <a href="#two-paths">Two Paths</a> |
+  <a href="#devtools">DevTools</a> |
   <a href="#frameworks">Frameworks</a> |
   <a href="#deploy">Deploy</a> |
   <a href="#agent-guard-config">Guard Config</a> |
@@ -62,7 +63,7 @@ my-project-agent/
 
 ### Path B — App
 
-Deployable agentic app with a FastAPI server, Streamlit chat UI, and cloud configs.
+Deployable agentic app with a FastAPI server, Streamlit chat UI, real-time DevTools, and cloud configs.
 
 ```bash
 npx agentvoy create my-project --build-mode app --deploy-target docker --yes
@@ -76,10 +77,13 @@ my-project-app/
 │   │   └── agent.py          # Agent logic
 │   ├── tools/
 │   │   └── tools.py          # Custom tools
+│   ├── trace/
+│   │   └── tracer.py         # Execution tracing (auto-generated)
 │   └── config/
 │       └── settings.py
-├── server.py                  # FastAPI — /run and /health
-├── streamlit_app.py           # Chat UI
+├── server.py                  # FastAPI — /run, /health, /dev, /ws/trace
+├── streamlit_app.py           # Chat UI with model picker & glass theme
+├── devtools.html              # Real-time agent DevTools dashboard
 ├── Dockerfile
 ├── docker-compose.yml
 ├── agent.guard.yml
@@ -128,6 +132,60 @@ npx agentvoy init
 npx agentvoy validate
 ```
 
+## DevTools
+
+App-mode projects include a built-in DevTools dashboard for real-time agent observability.
+
+### `agentvoy dev` — Live development server
+
+```bash
+cd my-project-app
+agentvoy dev
+```
+
+Starts your agent server with hot-reload and opens the DevTools dashboard at `http://localhost:8080/dev`.
+
+### What you get
+
+- **Real-time trace streaming** — WebSocket-powered event feed showing every agent action as it happens
+- **Event timeline** — agent_start, llm_call, tool_call, guard_check, pipeline_stage, agent_complete
+- **Pipeline visualization** — see multi-agent stages progress in real time
+- **Detail inspector** — click any event to see full payload (model, tokens, latency, tool I/O)
+- **Dark-themed dashboard** — single-page HTML, no extra dependencies
+
+### Endpoints
+
+Every app-mode project exposes these DevTools endpoints:
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /dev` | DevTools dashboard UI |
+| `WS /ws/trace` | Real-time trace event stream |
+| `GET /dev/events` | All events as JSON |
+| `GET /health` | Health check |
+
+### Trace instrumentation
+
+All 7 framework adapters are instrumented out of the box. The tracer collects:
+
+| Event | Data |
+|-------|------|
+| `agent_start` | agent name, prompt, model |
+| `llm_call` | model, latency, tokens in/out |
+| `tool_call` | tool name, input, output, latency |
+| `guard_check` | check type (input/output), pass/fail |
+| `pipeline_stage` | stage name, index, status |
+| `agent_complete` | agent name, result preview |
+
+## Streamlit Chat UI
+
+App-mode projects include a production-ready chat interface:
+
+- **Glassmorphism dark theme** — styled with backdrop blur and gradient accents
+- **Dynamic model switching** — auto-detects API keys from `.env` and shows available models (GPT-4o, Claude Sonnet, Gemini Flash, etc.)
+- **Guard summary** — sidebar displays guardrail results for each response
+- **Powered by AgentVoy** footer on every generated app
+
 ## Frameworks
 
 | Framework | Language | Status |
@@ -153,6 +211,38 @@ npx agentvoy validate
 
 ## Deploy
 
+### `agentvoy deploy` — One-command deployment
+
+```bash
+cd my-project-app
+agentvoy deploy --target docker
+```
+
+**Docker** — builds the image and runs the container:
+
+```bash
+agentvoy deploy --target docker
+# Builds: docker build -t my-project .
+# Runs:   docker run -p 8080:8080 --env-file .env my-project
+# Agent:  http://localhost:8080
+# DevTools: http://localhost:8080/dev
+```
+
+**Fly.io** — deploys to the cloud in one step:
+
+```bash
+agentvoy deploy --target fly-io
+# Checks flyctl auth, sets secrets from .env, deploys
+# Live URL: https://my-project.fly.dev
+# DevTools: https://my-project.fly.dev/dev
+```
+
+**Dry run** — generate deployment files without deploying:
+
+```bash
+agentvoy deploy --target docker --dry-run
+```
+
 ### Deploy during creation
 
 Pick a deployment target when creating an app project:
@@ -173,7 +263,7 @@ cd my-project-agent
 npx agentvoy deploy --target docker
 ```
 
-This generates `server.py`, `streamlit_app.py`, and all deployment files for the chosen target — without touching your existing agent code.
+This generates `server.py`, `streamlit_app.py`, `devtools.html`, and all deployment files — without touching your existing agent code.
 
 ### Deployment targets
 
@@ -270,7 +360,8 @@ with guard.session() as session:
 
 ```bash
 agentvoy create [name]     # Create a new agent or app project
-agentvoy deploy            # Add deployment config to an existing project
+agentvoy dev               # Start agent server with DevTools dashboard (app mode)
+agentvoy deploy            # Deploy to Docker, Fly.io, or other targets
 agentvoy init              # Add agent.guard.yml to an existing project
 agentvoy validate          # Validate your agent.guard.yml config
 agentvoy list              # List supported frameworks, models, and targets
@@ -285,9 +376,14 @@ agentvoy/                        # TypeScript monorepo
       src/
         adapters/                # Framework adapters (openai, crewai, …)
         deployers/               # Deployment adapters (docker, fly-io, …)
+          tracer.ts              # Agent execution tracer generator
+          devtools-dashboard.ts  # DevTools HTML dashboard generator
+          api-wrapper.ts         # server.py generator (with /dev endpoints)
+          streamlit-app.ts       # Streamlit chat UI generator
+          pipeline.ts            # Multi-agent pipeline generator
         types.ts                 # Universal type system
         config.ts                # agent.guard.yml parser
-    cli/                         # agentvoy CLI
+    cli/                         # agentvoy CLI (create, dev, deploy, init, validate, list)
     create-agentvoy/             # npx create-agentvoy shorthand
 
 agentvoy-guard/                  # Python runtime enforcement package
@@ -322,6 +418,11 @@ node packages/cli/dist/index.js create test-project --yes
 
 # Smoke test app mode
 node packages/cli/dist/index.js create test-project --build-mode app --deploy-target docker --yes
+
+# Test DevTools
+cd test-project-app
+pip install -r requirements.txt
+agentvoy dev  # opens http://localhost:8080/dev
 ```
 
 ## License
