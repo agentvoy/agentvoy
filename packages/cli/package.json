@@ -1,6 +1,6 @@
 {
   "name": "agentvoy",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "CLI for AgentVoy — scaffold, develop, and deploy AI agents across any framework",
   "bin": {
     "agentvoy": "dist/index.js"
