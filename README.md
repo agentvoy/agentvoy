@@ -30,6 +30,10 @@
 
 **One command. Any framework. Any model. Deploy anywhere.**
 
+<p align="center">
+  <img src="media/demo-create.gif" alt="AgentVoy CLI — create a project in seconds" width="600" />
+</p>
+
 ## Two Paths
 
 AgentVoy asks upfront what you want to build:
@@ -108,6 +112,10 @@ src/
 ```
 
 ## Quick Start
+
+<p align="center">
+  <img src="media/demo-run.gif" alt="AgentVoy — running an agent app" width="600" />
+</p>
 
 ```bash
 # Interactive — guided prompts for framework, model, and build mode
