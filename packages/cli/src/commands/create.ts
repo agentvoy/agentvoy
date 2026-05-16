@@ -373,6 +373,35 @@ export const createCommand = new Command("create")
         }
       }
 
+      // ── Framework → Provider dependency notice ────────────────
+      const frameworkProviderMap: Record<string, string[]> = {
+        openai: ["openai"],
+        anthropic: ["anthropic"],
+        "google-adk": ["google"],
+        crewai: ["openai", "anthropic", "google", "ollama", "groq"],
+        langgraph: ["openai", "anthropic", "google"],
+        llamaindex: ["openai", "anthropic", "google"],
+        autogen: ["openai", "anthropic"],
+      };
+      const supportedProviders = frameworkProviderMap[framework] || [];
+      const providerKeyMap: Record<string, string> = {
+        openai: "OPENAI_API_KEY",
+        anthropic: "ANTHROPIC_API_KEY",
+        google: "GOOGLE_API_KEY",
+        ollama: "(no key needed)",
+        groq: "GROQ_API_KEY",
+        mistral: "MISTRAL_API_KEY",
+      };
+      const requiredKey = providerKeyMap[provider] || `${provider.toUpperCase()}_API_KEY`;
+
+      console.log("");
+      console.log(chalk.yellow("  ⚠ Note:") + chalk.dim(` Framework "${framework}" requires ${chalk.bold(requiredKey)} in your .env`));
+      if (!supportedProviders.includes(provider)) {
+        console.log(chalk.yellow(`    "${framework}" may not support provider "${provider}" natively.`));
+        console.log(chalk.yellow(`    Supported providers: ${supportedProviders.join(", ")}`));
+      }
+      console.log(chalk.dim(`  To switch models later, edit ${chalk.cyan("DEFAULT_MODEL")} in your .env file.`));
+
       console.log("");
       console.log(
         chalk.dim("  Edit ") +

@@ -132,6 +132,7 @@ https://github.com/agentvoy
 LangGraph agent with a stateful agentic loop.
 """
 
+import os
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
@@ -144,7 +145,7 @@ from tools import get_tools
 def create_graph(model_override: str | None = None):
     """Build the agent state graph."""
     tools = get_tools()
-    llm = ${llmClass}(model=model_override or "${model}").bind_tools(tools)
+    llm = ${llmClass}(model=model_override or os.environ.get("DEFAULT_MODEL", "${model}")).bind_tools(tools)
     tool_node = ToolNode(tools)
 
     def should_continue(state: AgentState) -> str:
@@ -194,7 +195,7 @@ def run_agent(prompt: str, model: str | None = None) -> str:
     except ImportError:
         tracer = None
 
-    _model = model or "${model}"
+    _model = model or os.environ.get("DEFAULT_MODEL", "${model}")
     if tracer:
         tracer.agent_start("${config.projectName}", prompt, _model)
 
@@ -344,5 +345,5 @@ agentvoy-guard>=0.1.0
 
 function generateEnvExample(config: ScaffoldConfig): string {
   const envKey = getApiKeyEnv(config);
-  return `${envKey}=your-api-key-here\n`;
+  return `${envKey}=your-api-key-here\nDEFAULT_MODEL=${config.model.model || "gpt-4o"}\n`;
 }

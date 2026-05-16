@@ -51,7 +51,7 @@ export const openaiAdapter: FrameworkAdapter = {
     });
     files.push({
       path: ".env.example",
-      content: "OPENAI_API_KEY=your-api-key-here\n",
+      content: `OPENAI_API_KEY=your-api-key-here\nDEFAULT_MODEL=${config.model.model || "gpt-4o"}\n`,
     });
     files.push({
       path: "agent.guard.yml",
@@ -106,6 +106,7 @@ function generateAgentFile(config: ScaffoldConfig, agentName: string): string {
 ${agentName} agent — Part of ${config.projectName} (Built with AgentVoy)
 """
 
+import os
 from agents import Agent, Runner
 ${toolsImport}
 
@@ -123,7 +124,7 @@ Follow these guidelines:
 - Ask for clarification when the request is ambiguous
 - Respect the guardrails defined in agent.guard.yml
 """,
-        model="${config.model.model || "gpt-4o"}",
+        model=os.environ.get("DEFAULT_MODEL", "${config.model.model || "gpt-4o"}"),
         tools=tools,
     )
 
@@ -142,7 +143,7 @@ def run_agent(prompt: str, model: str | None = None) -> str:
     except ImportError:
         tracer = None
 
-    _model = model or "${config.model.model || "gpt-4o"}"
+    _model = model or os.environ.get("DEFAULT_MODEL", "${config.model.model || "gpt-4o"}")
     if tracer:
         tracer.agent_start("${agentName}", prompt, _model)
 

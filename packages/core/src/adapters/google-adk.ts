@@ -43,7 +43,7 @@ export const googleAdkAdapter: FrameworkAdapter = {
 
     const baseReqs = `google-adk>=0.5.0\npython-dotenv>=1.0.0\nagentvoy-guard>=0.1.0\n`;
     files.push({ path: "requirements.txt", content: isApp ? appendAppRequirements(baseReqs) : baseReqs });
-    files.push({ path: ".env.example", content: "GOOGLE_API_KEY=your-api-key-here\n" });
+    files.push({ path: ".env.example", content: `GOOGLE_API_KEY=your-api-key-here\nDEFAULT_MODEL=${config.model.model || "gemini-2.0-flash"}\n` });
     files.push({
       path: "agent.guard.yml",
       content: generateDefaultConfig(config.projectName, "google", config.model.model || "gemini-2.0-flash"),
@@ -90,6 +90,7 @@ ${config.projectName} — run_agent entry point for server.py
 Wraps the Google ADK agent as a single callable.
 """
 
+import os
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -109,7 +110,7 @@ def run_agent(prompt: str, model: str | None = None) -> str:
         tracer = None
 
     guard = Guard.from_config()
-    _model = model or "${config.model.model || "gemini-2.0-flash"}"
+    _model = model or os.environ.get("DEFAULT_MODEL", "${config.model.model || "gemini-2.0-flash"}")
     if tracer:
         tracer.agent_start("${config.projectName}", prompt, _model)
 
@@ -162,12 +163,16 @@ ${config.projectName} — Built with AgentVoy
 https://github.com/agentvoy
 """
 
+import os
+from dotenv import load_dotenv
 from google.adk.agents import Agent
 from .tools import search_web, read_file
 
+load_dotenv()
+
 root_agent = Agent(
     name="${config.projectName}",
-    model="${model}",
+    model=os.environ.get("DEFAULT_MODEL", "${model}"),
     description="AI agent created with AgentVoy",
     instruction="""You are a helpful AI assistant.
 

@@ -39,7 +39,7 @@ export const anthropicAdapter: FrameworkAdapter = {
 
     const baseReqs = `anthropic>=0.40.0\npython-dotenv>=1.0.0\nagentvoy-guard>=0.1.0\n`;
     files.push({ path: "requirements.txt", content: isApp ? appendAppRequirements(baseReqs) : baseReqs });
-    files.push({ path: ".env.example", content: "ANTHROPIC_API_KEY=your-api-key-here\n" });
+    files.push({ path: ".env.example", content: `ANTHROPIC_API_KEY=your-api-key-here\nDEFAULT_MODEL=${config.model.model || "claude-sonnet-4-20250514"}\n` });
     files.push({
       path: "agent.guard.yml",
       content: generateDefaultConfig(config.projectName, "anthropic", config.model.model || "claude-sonnet-4-20250514"),
@@ -91,6 +91,7 @@ ${config.projectName} — Built with AgentVoy
 https://github.com/agentvoy
 """
 
+import os
 import anthropic
 ${toolsImport}
 
@@ -111,7 +112,7 @@ def run_agent(prompt: str, model: str | None = None) -> str:
     except ImportError:
         tracer = None
 
-    _model = model or "${model}"
+    _model = model or os.environ.get("DEFAULT_MODEL", "${model}")
     if tracer:
         tracer.agent_start("${config.projectName}", prompt, _model)
 

@@ -42,7 +42,7 @@ export const autogenAdapter: FrameworkAdapter = {
 
     const envVar = getEnvVar(config.model.provider);
     files.push({ path: "requirements.txt", content: generateRequirements(isApp) });
-    files.push({ path: ".env.example", content: `${envVar}=your-api-key-here\n` });
+    files.push({ path: ".env.example", content: `${envVar}=your-api-key-here\nDEFAULT_MODEL=${config.model.model || "gpt-4o"}\n` });
     files.push({
       path: "agent.guard.yml",
       content: generateDefaultConfig(config.projectName, config.model.provider, config.model.model),
@@ -181,7 +181,7 @@ def run_agent(prompt: str, model: str | None = None) -> str:
     except ImportError:
         tracer = None
 
-    _model = model or "${config.model.model || "gpt-4o"}"
+    _model = model or os.environ.get("DEFAULT_MODEL", "${config.model.model || "gpt-4o"}")
     if tracer:
         tracer.agent_start("${agentName}", prompt, _model)
 

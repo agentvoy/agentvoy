@@ -88,6 +88,7 @@ ${config.projectName} — run_agent entry point for server.py
 Wraps the CrewAI crew as a single callable.
 """
 
+import os
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -103,7 +104,7 @@ def run_agent(prompt: str, model: str | None = None) -> str:
     except ImportError:
         tracer = None
 
-    _model = model or "crewai"
+    _model = model or os.environ.get("DEFAULT_MODEL", "${config.model.model || "gpt-4o"}")
     if tracer:
         tracer.agent_start("${config.projectName}", prompt, _model)
 
@@ -171,9 +172,14 @@ function generateAgentsFile(config: ScaffoldConfig, isApp = false): string {
 Agent definitions for ${config.projectName}.
 """
 
+import os
+from dotenv import load_dotenv
 from crewai import Agent
 ${toolsImport}
 
+load_dotenv()
+
+_default_model = os.environ.get("DEFAULT_MODEL", "${model}")
 
 researcher = Agent(
     role="Research Analyst",
@@ -182,7 +188,7 @@ researcher = Agent(
 for detail. You excel at finding relevant information and synthesizing
 it into clear insights.""",
     tools=[search_tool],
-    llm="${model}",
+    llm=_default_model,
     verbose=True,
 )
 
@@ -192,7 +198,7 @@ writer = Agent(
     backstory="""You are a skilled writer who transforms complex research
 into readable, well-structured content. You focus on clarity and
 accuracy.""",
-    llm="${model}",
+    llm=_default_model,
     verbose=True,
 )
 `;
@@ -302,5 +308,5 @@ function generateEnvExample(config: ScaffoldConfig): string {
   const envVar =
     config.model.api_key_env ||
     `${config.model.provider.toUpperCase()}_API_KEY`;
-  return `${envVar}=your-api-key-here\n`;
+  return `${envVar}=your-api-key-here\nDEFAULT_MODEL=${config.model.model || "gpt-4o"}\n`;
 }
