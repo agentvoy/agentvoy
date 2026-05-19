@@ -33,7 +33,9 @@
 **One command. Any framework. Any model. Deploy anywhere.**
 
 <p align="center">
-  <img src="media/demo-create.gif" alt="AgentVoy CLI — create a project in seconds" width="600" />
+  <video src="https://github.com/agentvoy/agentvoy/raw/main/media/demo-hero.mp4" width="700" autoplay loop muted playsinline>
+    <img src="media/demo-create.gif" alt="AgentVoy CLI — create a project in seconds" width="700" />
+  </video>
 </p>
 
 ## Two Paths
